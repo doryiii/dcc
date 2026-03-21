@@ -5,7 +5,7 @@ the application flash area.
 
 - Runs both on host PC and natively on the AVR hardware.
 - When running on the avr128db28, it acts as a bootloader that compiles C source
-  to machine code on the target chip and runs it.
+  via UART to machine code on the target chip and runs it.
 - In its current state, uses less than 30KB of flash.
 
 (Why AVR128DB28? That's the chip I have on hand)
@@ -38,9 +38,9 @@ Notable limitations:
   up 50-70 bytes, practically limiting the amount of nodes to 150-250 nodes
   given the avr128db28's 16KB SRAM. Future expansion may include external SRAM
   support
-- The compiler is self-hosting and likely never will be: no AVR code can modify
-  the code area it is currently executing from, and the boot section can only
-  be modified by an external programmer
+- The compiler is not self-hosting and likely never will be: no AVR code can
+  modify the code area it is currently executing from, and the boot section can
+  only be modified by an external programmer
 
 ## Usage
 
