@@ -18,4 +18,4 @@
 #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 #endif
 
-#endif // _GPIO_H
+#endif  // _GPIO_H

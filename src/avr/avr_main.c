@@ -18,59 +18,64 @@
 #define BOOT_SIZE (0xC0 * 512UL)
 #define APP_START BOOT_SIZE
 
-FUSES = {.OSCCFG = CLKSEL_OSCHF_gc,
-         .SYSCFG0 = CRCSRC_NOCRC_gc | RSTPINCFG_GPIO_gc,
-         .SYSCFG1 = SUT_64MS_gc,
-         .CODESIZE = 0x00,
-         .BOOTSIZE = 0xC0};
+FUSES = {
+    .OSCCFG = CLKSEL_OSCHF_gc,
+    .SYSCFG0 = CRCSRC_NOCRC_gc | RSTPINCFG_GPIO_gc,
+    .SYSCFG1 = SUT_64MS_gc,
+    .CODESIZE = 0x00,
+    .BOOTSIZE = 0xC0
+};
 
 static inline void pgm_word_write(uint32_t address, uint16_t data) {
-  __asm__ __volatile__("movw r30, %A0\n\t"
-                       "out %2, %C0\n\t"
-                       "movw r0, %A1\n\t"
-                       "spm\n\t"
-                       "clr r1\n\t"
-                       :
-                       : "r"(address), "r"(data), "I"(_SFR_IO_ADDR(RAMPZ))
-                       : "r0", "r30", "r31");
+  __asm__ __volatile__(
+      "movw r30, %A0\n\t"
+      "out %2, %C0\n\t"
+      "movw r0, %A1\n\t"
+      "spm\n\t"
+      "clr r1\n\t"
+      :
+      : "r"(address), "r"(data), "I"(_SFR_IO_ADDR(RAMPZ))
+      : "r0", "r30", "r31"
+  );
 }
 
 static inline void pgm_jmp_far(uint32_t word_address) {
-  __asm__ __volatile__("movw r30, %A0\n\t"
-                       "out %1, %C0\n\t"
-                       "ijmp\n\t"
-                       :
-                       : "r"(word_address), "I"(_SFR_IO_ADDR(RAMPZ))
-                       : "r30", "r31");
+  __asm__ __volatile__(
+      "movw r30, %A0\n\t"
+      "out %1, %C0\n\t"
+      "ijmp\n\t"
+      :
+      : "r"(word_address), "I"(_SFR_IO_ADDR(RAMPZ))
+      : "r30", "r31"
+  );
 }
 
 static void wait_nvm() {
-  while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm))
-    ;
+  while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm));
 }
 
 static void erase_page(uint32_t address) {
   wait_nvm();
-  ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
-  ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_FLPER_gc);
+  ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
+  ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_FLPER_gc);
   pgm_word_write(address, 0xFFFF);
   wait_nvm();
-  ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
+  ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 }
 
-static void write_page(uint32_t address, uint8_t *buf) {
+static void write_page(uint32_t address, uint8_t* buf) {
   erase_page(address);
-  ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_FLWR_gc);
+  ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_FLWR_gc);
   for (uint16_t i = 0; i < PROGMEM_PAGE_SIZE; i += 2) {
     uint16_t data = buf[i] | (buf[i + 1] << 8);
     wait_nvm();
     pgm_word_write(address + i, data);
   }
   wait_nvm();
-  ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
+  ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 }
 
-static void read_page(uint32_t address, uint8_t *buf) {
+static void read_page(uint32_t address, uint8_t* buf) {
   for (uint16_t i = 0; i < PROGMEM_PAGE_SIZE; i++) {
     buf[i] = pgm_read_byte_far(address + i);
   }
@@ -79,10 +84,8 @@ static void read_page(uint32_t address, uint8_t *buf) {
 static bool eof_reached = false;
 
 int avr_getchar(void) {
-  if (eof_reached)
-    return EOF;
-  while (!usart_available(2))
-    ;
+  if (eof_reached) return EOF;
+  while (!usart_available(2));
   uint8_t c = usart_getc(2);
   if (c == '\r' || c == '\n') {
     usart_putc(2, '\r');
@@ -100,7 +103,7 @@ int avr_getchar(void) {
 static uint32_t avr_pc = APP_START;
 static uint8_t current_page_buf[PROGMEM_PAGE_SIZE];
 
-static void avr_emit_cb(const char *line) {
+static void avr_emit_cb(const char* line) {
   usart_print(2, line);
   usart_putc(2, '\r');
   uint32_t inst;
@@ -118,17 +121,17 @@ static void avr_emit_cb(const char *line) {
   }
 }
 
-void dasm_read_page_cb(uint32_t page_addr, uint8_t *page_buf) {
+void dasm_read_page_cb(uint32_t page_addr, uint8_t* page_buf) {
   read_page(APP_START + page_addr, page_buf);
 }
 
-void dasm_write_page_cb(uint32_t page_addr, uint8_t *page_buf) {
+void dasm_write_page_cb(uint32_t page_addr, uint8_t* page_buf) {
   write_page(APP_START + page_addr, page_buf);
 }
 
 int main(void) {
   // Move interrupts to boot section
-  ccp_write_io((void *)&CPUINT.CTRLA, CPUINT_IVSEL_bm);
+  ccp_write_io((void*)&CPUINT.CTRLA, CPUINT_IVSEL_bm);
 
   set_clock();
   usart_init(2, 9600);
@@ -143,7 +146,7 @@ int main(void) {
 
   dasm_init();
   preprocessor_init(avr_getchar);
-  ASTNode *ast = parse_program(preprocessor_getchar);
+  ASTNode* ast = parse_program(preprocessor_getchar);
 
   usart_print_P(2, PSTR("Parsing done. Generating code...\r\n"));
   codegen_set_emit_cb(avr_emit_cb);
@@ -164,12 +167,11 @@ int main(void) {
   usart_tx_flush(2);
   _delay_ms(1000);
 
-  cli(); // Disable interrupts before jumping
+  cli();  // Disable interrupts before jumping
   // Lock boot section (may not be needed)
   NVMCTRL.CTRLB = NVMCTRL_BOOTRP_bm;
 
   pgm_jmp_far(APP_START / 2);
 
-  while (1)
-    ;
+  while (1);
 }

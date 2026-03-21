@@ -51,7 +51,8 @@ unsigned char blink_bin[] = {
     0x6a, 0x95, 0xe1, 0xf7, 0x8f, 0x93, 0x9f, 0x93, 0x80, 0xe0, 0x94, 0xe0,
     0xfc, 0x01, 0x37, 0x96, 0x9f, 0x91, 0x8f, 0x91, 0x80, 0x83, 0x49, 0xcf,
     0x81, 0xe0, 0x90, 0xe0, 0x00, 0xc0, 0x24, 0x96, 0xcd, 0xbf, 0xde, 0xbf,
-    0xdf, 0x91, 0xcf, 0x91, 0x08, 0x95};
+    0xdf, 0x91, 0xcf, 0x91, 0x08, 0x95
+};
 unsigned int blink_bin_len = 534;
 
 /* BOOTSIZE fuse sets the size (end) of the boot section in blocks of 512 bytes.
@@ -60,30 +61,36 @@ unsigned int blink_bin_len = 534;
 #define BOOT_SIZE (0xC0 * 512UL)
 #define APP_START BOOT_SIZE
 
-FUSES = {.OSCCFG = CLKSEL_OSCHF_gc,
-         .SYSCFG0 = CRCSRC_NOCRC_gc | RSTPINCFG_GPIO_gc,
-         .SYSCFG1 = SUT_64MS_gc,
-         .CODESIZE = 0x00,
-         .BOOTSIZE = 0xC0};
+FUSES = {
+    .OSCCFG = CLKSEL_OSCHF_gc,
+    .SYSCFG0 = CRCSRC_NOCRC_gc | RSTPINCFG_GPIO_gc,
+    .SYSCFG1 = SUT_64MS_gc,
+    .CODESIZE = 0x00,
+    .BOOTSIZE = 0xC0
+};
 
 static inline void pgm_word_write(uint32_t address, uint16_t data) {
-  __asm__ __volatile__("movw r30, %A0\n\t"
-                       "out %2, %C0\n\t"
-                       "movw r0, %A1\n\t"
-                       "spm\n\t"
-                       "clr r1\n\t"
-                       :
-                       : "r"(address), "r"(data), "I"(_SFR_IO_ADDR(RAMPZ))
-                       : "r0", "r30", "r31");
+  __asm__ __volatile__(
+      "movw r30, %A0\n\t"
+      "out %2, %C0\n\t"
+      "movw r0, %A1\n\t"
+      "spm\n\t"
+      "clr r1\n\t"
+      :
+      : "r"(address), "r"(data), "I"(_SFR_IO_ADDR(RAMPZ))
+      : "r0", "r30", "r31"
+  );
 }
 
 static inline void pgm_jmp_far(uint32_t word_address) {
-  __asm__ __volatile__("movw r30, %A0\n\t"
-                       "out %1, %C0\n\t"
-                       "ijmp\n\t"
-                       :
-                       : "r"(word_address), "I"(_SFR_IO_ADDR(RAMPZ))
-                       : "r30", "r31");
+  __asm__ __volatile__(
+      "movw r30, %A0\n\t"
+      "out %1, %C0\n\t"
+      "ijmp\n\t"
+      :
+      : "r"(word_address), "I"(_SFR_IO_ADDR(RAMPZ))
+      : "r30", "r31"
+  );
 }
 
 int main(void) {
@@ -91,30 +98,27 @@ int main(void) {
   PORTC.OUTSET = 1 << 0;
 
   /* Wait for flash to be ready */
-  while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm))
-    ;
+  while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm));
 
   /* Clear the current command */
-  ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
+  ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 
   for (uint32_t i = 0; i < (uint32_t)blink_bin_len; i += 2) {
     /* If we are at the start of a new page, erase it first */
     if ((i % PROGMEM_PAGE_SIZE) == 0) {
-      while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm))
-        ;
-      ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
+      while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm));
+      ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 
       /* Send Flash Page Erase command */
-      ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_FLPER_gc);
+      ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_FLPER_gc);
       pgm_word_write(APP_START + i, 0xFFFF); /* Dummy write to trigger erase */
 
       /* Wait for erase to finish */
-      while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm))
-        ;
-      ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
+      while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm));
+      ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 
       /* Re-enable flash write mode */
-      ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_FLWR_gc);
+      ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_FLWR_gc);
     }
 
     uint16_t data = blink_bin[i];
@@ -124,15 +128,13 @@ int main(void) {
       data |= 0xFF00;
     }
 
-    while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm))
-      ;
+    while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm));
     pgm_word_write(APP_START + i, data);
   }
 
   /* Wait for the final write to complete */
-  while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm))
-    ;
-  ccp_write_spm((void *)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
+  while (NVMCTRL.STATUS & (NVMCTRL_EEBUSY_bm | NVMCTRL_FBUSY_bm));
+  ccp_write_spm((void*)&NVMCTRL.CTRLA, NVMCTRL_CMD_NONE_gc);
 
   /* Disable interrupts (good practice before jumping to app) */
   __asm__ __volatile__("cli");

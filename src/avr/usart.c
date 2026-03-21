@@ -13,41 +13,40 @@ static volatile uint8_t usart_rx_buf[3][USART_BUFSIZE];
 static volatile uint8_t usart_rx_bufindex[3], usart_rx_buflen[3];
 static volatile uint8_t usart_tx_buf[3][USART_BUFSIZE];
 static volatile uint8_t usart_tx_bufindex[3], usart_tx_buflen[3];
-volatile USART_t *dev[3] = {
-    (USART_t *)0x0800,
-    (USART_t *)0x0820,
-    (USART_t *)0x0840,
+volatile USART_t* dev[3] = {
+    (USART_t*)0x0800,
+    (USART_t*)0x0820,
+    (USART_t*)0x0840,
 };
 
 void usart_init(uint8_t n, uint32_t baud) {
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     switch (n) {
-    case 0:
-      SET_AS_OUTPUT(PORTA, 0);
-      SET_AS_INPUT(PORTA, 1);
-      break;
-    case 1:
-      SET_AS_OUTPUT(PORTC, 0);
-      SET_AS_INPUT(PORTC, 1);
-      break;
-    case 2:
-      SET_AS_OUTPUT(PORTF, 0);
-      SET_AS_INPUT(PORTF, 1);
-      break;
-    default:
-      return;
+      case 0:
+        SET_AS_OUTPUT(PORTA, 0);
+        SET_AS_INPUT(PORTA, 1);
+        break;
+      case 1:
+        SET_AS_OUTPUT(PORTC, 0);
+        SET_AS_INPUT(PORTC, 1);
+        break;
+      case 2:
+        SET_AS_OUTPUT(PORTF, 0);
+        SET_AS_INPUT(PORTF, 1);
+        break;
+      default:
+        return;
     }
     dev[n]->BAUD = (64 / 16) * (F_CPU / baud);
     dev[n]->CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc |
                     USART_SBMODE_1BIT_gc | USART_CHSIZE_8BIT_gc;
     dev[n]->CTRLB = USART_RXEN_bm | USART_TXEN_bm | USART_RXMODE_NORMAL_gc;
-    dev[n]->CTRLA = USART_RXCIE_bm; // interrupts
+    dev[n]->CTRLA = USART_RXCIE_bm;  // interrupts
   }
 }
 
 void usart_putc(uint8_t n, char c) {
-  while (usart_tx_buflen[n] >= USART_BUFSIZE)
-    ;
+  while (usart_tx_buflen[n] >= USART_BUFSIZE);
   // the only other thing modifying buflen only decreases it.
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     uint8_t i = (usart_tx_bufindex[n] + usart_tx_buflen[n]++) % USART_BUFSIZE;
@@ -60,17 +59,13 @@ void usart_putc(uint8_t n, char c) {
 uint8_t usart_available(uint8_t n) { return usart_rx_buflen[n]; }
 
 void usart_tx_flush(uint8_t n) {
-  while (usart_tx_buflen[n])
-    ;
-  while (dev[n]->CTRLA & USART_DREIE_bm)
-    ;
-  while (!(dev[n]->STATUS & USART_TXCIF_bm))
-    ;
+  while (usart_tx_buflen[n]);
+  while (dev[n]->CTRLA & USART_DREIE_bm);
+  while (!(dev[n]->STATUS & USART_TXCIF_bm));
 }
 
 uint8_t usart_getc(uint8_t n) {
-  if (usart_rx_buflen[n] == 0)
-    return 0;
+  if (usart_rx_buflen[n] == 0) return 0;
   uint8_t c;
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     c = usart_rx_buf[n][usart_rx_bufindex[n]++];
@@ -80,18 +75,17 @@ uint8_t usart_getc(uint8_t n) {
   return c;
 }
 
-void usart_print(uint8_t n, const char *c) {
-  while (*c)
-    usart_putc(n, *(c++));
+void usart_print(uint8_t n, const char* c) {
+  while (*c) usart_putc(n, *(c++));
 }
 
-void usart_print_P(uint8_t n, const char *c) {
+void usart_print_P(uint8_t n, const char* c) {
   for (uint8_t x; (x = pgm_read_byte(c++));) {
     usart_putc(n, x);
   }
 }
 
-void usart_write_P(uint8_t n, const char *c, uint32_t len) {
+void usart_write_P(uint8_t n, const char* c, uint32_t len) {
   for (uint32_t i = 0; i < len; i++) {
     uint8_t x = pgm_read_byte(c++);
     usart_putc(n, x);

@@ -40,8 +40,7 @@ inline void set_clock() {
 
     CPU_CCP = CCP_IOREG_gc;
     CLKCTRL.OSCHFCTRLA = FRQSEL;
-    while (!(CLKCTRL.MCLKSTATUS & CLKCTRL_OSCHFS_bm))
-      ;
+    while (!(CLKCTRL.MCLKSTATUS & CLKCTRL_OSCHFS_bm));
   }
 }
 
@@ -49,8 +48,7 @@ void (*rtc_pit_isr)(void) = NULL;
 
 void start_rtc_pit_isr(uint8_t period_setting, void (*isr_func)(void)) {
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-    while (RTC.STATUS | RTC.PITSTATUS)
-      ;
+    while (RTC.STATUS | RTC.PITSTATUS);
     RTC.CLKSEL = RTC_CLKSEL_OSC32K_gc;
     RTC.PITINTCTRL = RTC_PI_bm;
     // 32768 cycles = 1s
@@ -60,7 +58,6 @@ void start_rtc_pit_isr(uint8_t period_setting, void (*isr_func)(void)) {
 }
 
 ISR(RTC_PIT_vect) {
-  if (rtc_pit_isr)
-    (*rtc_pit_isr)();
+  if (rtc_pit_isr) (*rtc_pit_isr)();
   RTC.PITINTFLAGS = RTC_PI_bm;
 }

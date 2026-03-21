@@ -1,4 +1,5 @@
 #include "dasm.h"
+
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -29,22 +30,22 @@ typedef struct {
 typedef struct Symbol {
   char name[32];
   uint32_t address;
-  struct Symbol *next;
+  struct Symbol* next;
 } Symbol;
 
 typedef struct Fixup {
   char name[32];
   uint32_t patch_address;
   uint8_t type;
-  struct Fixup *next;
+  struct Fixup* next;
 } Fixup;
 
-static Symbol *symbols = NULL;
-static Fixup *fixups = NULL;
+static Symbol* symbols = NULL;
+static Fixup* fixups = NULL;
 static uint32_t dasm_pc = 0;
 
-static void add_symbol(const char *name, uint32_t address) {
-  Symbol *s = (Symbol *)malloc(sizeof(Symbol));
+static void add_symbol(const char* name, uint32_t address) {
+  Symbol* s = (Symbol*)malloc(sizeof(Symbol));
   strncpy(s->name, name, 31);
   s->name[31] = '\0';
   s->address = address;
@@ -52,8 +53,8 @@ static void add_symbol(const char *name, uint32_t address) {
   symbols = s;
 }
 
-static void add_fixup(const char *name, uint32_t patch_address, uint8_t type) {
-  Fixup *f = (Fixup *)malloc(sizeof(Fixup));
+static void add_fixup(const char* name, uint32_t patch_address, uint8_t type) {
+  Fixup* f = (Fixup*)malloc(sizeof(Fixup));
   strncpy(f->name, name, 31);
   f->name[31] = '\0';
   f->patch_address = patch_address;
@@ -62,11 +63,12 @@ static void add_fixup(const char *name, uint32_t patch_address, uint8_t type) {
   fixups = f;
 }
 
-static uint32_t find_symbol(const char *name);
+static uint32_t find_symbol(const char* name);
 
-void dasm_apply_fixups(dasm_read_page_fn read_page,
-                       dasm_write_page_fn write_page) {
-  Fixup *f = fixups;
+void dasm_apply_fixups(
+    dasm_read_page_fn read_page, dasm_write_page_fn write_page
+) {
+  Fixup* f = fixups;
   uint8_t page_buf[512];
   uint32_t current_page = 0xFFFFFFFF;
   bool page_dirty = false;
@@ -95,16 +97,16 @@ void dasm_apply_fixups(dasm_read_page_fn read_page,
       uint32_t offset = f->patch_address - current_page;
       uint16_t op = page_buf[offset] | (page_buf[offset + 1] << 8);
 
-      if (f->type == 0) { // RJMP/RCALL (12-bit relative)
+      if (f->type == 0) {  // RJMP/RCALL (12-bit relative)
         int k = (address - (f->patch_address + 2)) / 2;
         op |= (k & 0x0FFF);
-      } else if (f->type == 1) { // BRLO/BRNE (7-bit relative)
+      } else if (f->type == 1) {  // BRLO/BRNE (7-bit relative)
         int k = (address - (f->patch_address + 2)) / 2;
         op |= ((k & 0x7F) << 3);
-      } else if (f->type == 2) { // LDI LO8
+      } else if (f->type == 2) {  // LDI LO8
         uint8_t k = address & 0xFF;
         op |= ((k & 0xF0) << 4) | (k & 0x0F);
-      } else if (f->type == 3) { // LDI HI8
+      } else if (f->type == 3) {  // LDI HI8
         uint8_t k = (address >> 8) & 0xFF;
         op |= ((k & 0xF0) << 4) | (k & 0x0F);
       }
@@ -123,49 +125,41 @@ void dasm_apply_fixups(dasm_read_page_fn read_page,
   }
 }
 
-static uint32_t find_symbol(const char *name) {
-  Symbol *s = symbols;
+static uint32_t find_symbol(const char* name) {
+  Symbol* s = symbols;
   while (s) {
-    if (strcmp(s->name, name) == 0)
-      return s->address;
+    if (strcmp(s->name, name) == 0) return s->address;
     s = s->next;
   }
   return 0xFFFFFFFF;
 }
 
-static AsmToken next_asm_token(const char **src) {
-  while (**src && isspace(**src) && **src != '\n')
-    (*src)++;
+static AsmToken next_asm_token(const char** src) {
+  while (**src && isspace(**src) && **src != '\n') (*src)++;
   AsmToken t = {ASM_TOK_EOF, "", 0};
-  if (**src == '\0')
-    return t;
+  if (**src == '\0') return t;
   if (**src == '\n') {
     t.type = ASM_TOK_NEWLINE;
     (*src)++;
     return t;
   }
   if (**src == ';') {
-    while (**src != '\n' && **src != '\0')
-      (*src)++;
+    while (**src != '\n' && **src != '\0') (*src)++;
     return next_asm_token(src);
   }
   if (**src == '/' && *(*src + 1) == '*') {
     (*src) += 2;
-    while (**src && !(**src == '*' && *(*src + 1) == '/'))
-      (*src)++;
-    if (**src)
-      (*src) += 2;
+    while (**src && !(**src == '*' && *(*src + 1) == '/')) (*src)++;
+    if (**src) (*src) += 2;
     return next_asm_token(src);
   }
 
-  const char *start = *src;
+  const char* start = *src;
   if (**src == '.') {
     (*src)++;
-    while (isalnum(**src) || **src == '_')
-      (*src)++;
+    while (isalnum(**src) || **src == '_') (*src)++;
     int len = *src - start;
-    if (len > 31)
-      len = 31;
+    if (len > 31) len = 31;
     strncpy(t.text, start, len);
     t.text[len] = '\0';
     if (**src == ':') {
@@ -177,11 +171,9 @@ static AsmToken next_asm_token(const char **src) {
     return t;
   }
   if (isalpha(**src) || **src == '_') {
-    while (isalnum(**src) || **src == '_')
-      (*src)++;
+    while (isalnum(**src) || **src == '_') (*src)++;
     int len = *src - start;
-    if (len > 31)
-      len = 31;
+    if (len > 31) len = 31;
     strncpy(t.text, start, len);
     t.text[len] = '\0';
     if (**src == ':') {
@@ -194,7 +186,7 @@ static AsmToken next_asm_token(const char **src) {
   }
   if (isdigit(**src)) {
     t.type = ASM_TOK_NUMBER;
-    t.value = (int)strtol(start, (char **)src, 0);
+    t.value = (int)strtol(start, (char**)src, 0);
     return t;
   }
   if (**src == ',') {
@@ -231,48 +223,40 @@ static AsmToken next_asm_token(const char **src) {
   return next_asm_token(src);
 }
 
-static int get_reg(const char *text) {
-  if (!text)
-    return -1;
+static int get_reg(const char* text) {
+  if (!text) return -1;
   if ((text[0] == 'r' || text[0] == 'R') && isdigit(text[1]))
     return atoi(text + 1);
-  if (strcmp(text, "Y") == 0)
-    return 28;
-  if (strcmp(text, "Z") == 0)
-    return 30;
-  if (strcmp(text, "SPL") == 0)
-    return 0x3D;
-  if (strcmp(text, "SPH") == 0)
-    return 0x3E;
+  if (strcmp(text, "Y") == 0) return 28;
+  if (strcmp(text, "Z") == 0) return 30;
+  if (strcmp(text, "SPL") == 0) return 0x3D;
+  if (strcmp(text, "SPH") == 0) return 0x3E;
   uint32_t sym = find_symbol(text);
-  if (sym != 0xFFFFFFFF)
-    return (int)sym;
+  if (sym != 0xFFFFFFFF) return (int)sym;
   return -1;
 }
 
-static int parse_expr(AsmToken *args, int *idx, int num_args) {
+static int parse_expr(AsmToken* args, int* idx, int num_args) {
   if (*idx < num_args && args[*idx].type == ASM_TOK_IDENTIFIER) {
     if (strcmp(args[*idx].text, "lo8") == 0 ||
         strcmp(args[*idx].text, "hi8") == 0) {
       bool lo = (args[*idx].text[0] == 'l');
-      (*idx)++; // lo8/hi8
-      (*idx)++; // (
+      (*idx)++;  // lo8/hi8
+      (*idx)++;  // (
       uint32_t val = 0;
       if (*idx < num_args && args[*idx].type == ASM_TOK_NUMBER) {
         val = args[*idx].value;
       } else if (*idx < num_args && args[*idx].type == ASM_TOK_IDENTIFIER) {
         val = find_symbol(args[*idx].text);
       }
-      (*idx)++; // symbol or number
-      (*idx)++; // )
-      if (val == 0xFFFFFFFF)
-        return 0;
+      (*idx)++;  // symbol or number
+      (*idx)++;  // )
+      if (val == 0xFFFFFFFF) return 0;
       return lo ? (val & 0xFF) : ((val >> 8) & 0xFF);
     } else {
       uint32_t val = find_symbol(args[*idx].text);
       (*idx)++;
-      if (val == 0xFFFFFFFF)
-        return 0;
+      if (val == 0xFFFFFFFF) return 0;
       return (int)val;
     }
   }
@@ -285,19 +269,19 @@ static int parse_expr(AsmToken *args, int *idx, int num_args) {
 void dasm_init(void) {
   dasm_pc = 0;
   while (symbols) {
-    Symbol *s = symbols;
+    Symbol* s = symbols;
     symbols = s->next;
     free(s);
   }
   while (fixups) {
-    Fixup *f = fixups;
+    Fixup* f = fixups;
     fixups = f->next;
     free(f);
   }
 }
 
-int dasm_emit(const char *asm_line, uint32_t *out_inst) {
-  const char *s = asm_line;
+int dasm_emit(const char* asm_line, uint32_t* out_inst) {
+  const char* s = asm_line;
   AsmToken t;
   int emitted_bytes = 0;
   while ((t = next_asm_token(&s)).type != ASM_TOK_EOF) {
@@ -318,9 +302,8 @@ int dasm_emit(const char *asm_line, uint32_t *out_inst) {
     }
 
     if (t.type == ASM_TOK_IDENTIFIER) {
-      const char *temp = s;
-      while (*temp && isspace(*temp) && *temp != '\n')
-        temp++;
+      const char* temp = s;
+      while (*temp && isspace(*temp) && *temp != '\n') temp++;
       if (*temp == '=') {
         s = temp + 1;
         AsmToken val_tok = next_asm_token(&s);
@@ -339,8 +322,7 @@ int dasm_emit(const char *asm_line, uint32_t *out_inst) {
       int num_args = 0;
       while ((t = next_asm_token(&s)).type != ASM_TOK_NEWLINE &&
              t.type != ASM_TOK_EOF) {
-        if (t.type != ASM_TOK_COMMA)
-          args[num_args++] = t;
+        if (t.type != ASM_TOK_COMMA) args[num_args++] = t;
       }
 
       uint16_t op = 0;
@@ -351,7 +333,7 @@ int dasm_emit(const char *asm_line, uint32_t *out_inst) {
         int d = get_reg(args[0].text);
         arg_idx = 1;
         int k = 0;
-        int fixup_type = 2; // lo8 default
+        int fixup_type = 2;  // lo8 default
         if (args[1].type == ASM_TOK_IDENTIFIER) {
           if (strcmp(args[1].text, "lo8") == 0 ||
               strcmp(args[1].text, "hi8") == 0) {
@@ -382,8 +364,9 @@ int dasm_emit(const char *asm_line, uint32_t *out_inst) {
 
         op = 0xE000 | ((k & 0xF0) << 4) | ((d & 0x0F) << 4) | (k & 0x0F);
         encoded = true;
-      } else if (strcmp(mnemonic, "rcall") == 0 ||
-                 strcmp(mnemonic, "rjmp") == 0) {
+      } else if (
+          strcmp(mnemonic, "rcall") == 0 || strcmp(mnemonic, "rjmp") == 0
+      ) {
         uint32_t target = find_symbol(args[0].text);
         int k = 0;
         if (target == 0xFFFFFFFF) {
@@ -393,10 +376,10 @@ int dasm_emit(const char *asm_line, uint32_t *out_inst) {
         }
         op = (strcmp(mnemonic, "rcall") == 0 ? 0xD000 : 0xC000) | (k & 0x0FFF);
         encoded = true;
-      } else if (strcmp(mnemonic, "brlo") == 0 ||
-                 strcmp(mnemonic, "brne") == 0 ||
-                 strcmp(mnemonic, "breq") == 0 ||
-                 strcmp(mnemonic, "brlt") == 0) {
+      } else if (
+          strcmp(mnemonic, "brlo") == 0 || strcmp(mnemonic, "brne") == 0 ||
+          strcmp(mnemonic, "breq") == 0 || strcmp(mnemonic, "brlt") == 0
+      ) {
         uint32_t target = find_symbol(args[0].text);
         int k = 0;
         if (target == 0xFFFFFFFF) {
@@ -448,8 +431,7 @@ int dasm_emit(const char *asm_line, uint32_t *out_inst) {
         encoded = true;
       } else if (strcmp(mnemonic, "std") == 0) {
         int q = 0;
-        if (num_args > 2 && args[1].type == ASM_TOK_PLUS)
-          q = args[2].value;
+        if (num_args > 2 && args[1].type == ASM_TOK_PLUS) q = args[2].value;
         int r = get_reg(args[num_args - 1].text);
         int yz_bit = (strcmp(args[0].text, "Y") == 0) ? 0x0008 : 0x0000;
         if (q == 0)
@@ -465,8 +447,7 @@ int dasm_emit(const char *asm_line, uint32_t *out_inst) {
       } else if (strcmp(mnemonic, "ldd") == 0) {
         int d = get_reg(args[0].text);
         int q = 0;
-        if (num_args > 3 && args[2].type == ASM_TOK_PLUS)
-          q = args[3].value;
+        if (num_args > 3 && args[2].type == ASM_TOK_PLUS) q = args[3].value;
         int yz_bit = (strcmp(args[1].text, "Y") == 0) ? 0x0008 : 0x0000;
         if (q == 0)
           op = (yz_bit ? 0x8008 : 0x8000) | ((d & 0x1F) << 4);
@@ -474,8 +455,9 @@ int dasm_emit(const char *asm_line, uint32_t *out_inst) {
           op = 0x8000 | yz_bit | ((d & 0x1F) << 4) | ((q & 0x20) << 8) |
                ((q & 0x18) << 7) | (q & 0x07);
         encoded = true;
-      } else if (strcmp(mnemonic, "adiw") == 0 ||
-                 strcmp(mnemonic, "sbiw") == 0) {
+      } else if (
+          strcmp(mnemonic, "adiw") == 0 || strcmp(mnemonic, "sbiw") == 0
+      ) {
         int r = get_reg(args[0].text);
         int k = args[1].value;
         int d = (r - 24) / 2;
@@ -530,8 +512,7 @@ int dasm_emit(const char *asm_line, uint32_t *out_inst) {
       }
 
       if (encoded) {
-        if (out_inst)
-          *out_inst = op;
+        if (out_inst) *out_inst = op;
         dasm_pc += 2;
         emitted_bytes = 2;
       }
