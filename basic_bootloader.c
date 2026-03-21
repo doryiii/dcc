@@ -1,3 +1,6 @@
+/* https://www.microchip.com/en-us/application-notes/an3341
+ * github.com/microchip-pic-avr-examples/avr128da48-cnano-bootloader-mplabx
+ */
 #include <avr/cpufunc.h>
 #include <avr/io.h>
 #include <stdint.h>
