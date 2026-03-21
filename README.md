@@ -1,3 +1,6 @@
+*Don't want to install a toolchain onto your computer to work with AVR chips?
+Well I have just the thing for you!*
+
 **D**ory's **C** **C**ompiler is a small, streaming C compiler and assembler
 designed to run natively on the **AVR128DB28** microcontroller. It operates as
 a bootloader, receiving C source code over UART and compiling it directly into
