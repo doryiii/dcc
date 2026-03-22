@@ -4,6 +4,35 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct StringPoolNode {
+  struct StringPoolNode* next;
+  char str[];
+} StringPoolNode;
+
+static StringPoolNode* string_pool = NULL;
+
+char* intern_string(const char* str) {
+  if (!str) return NULL;
+  for (StringPoolNode* node = string_pool; node != NULL; node = node->next) {
+    if (strcmp(node->str, str) == 0) return node->str;
+  }
+  StringPoolNode* new_node = (StringPoolNode*)malloc(sizeof(StringPoolNode) + strlen(str) + 1);
+  strcpy(new_node->str, str);
+  new_node->next = string_pool;
+  string_pool = new_node;
+  return new_node->str;
+}
+
+void ast_free_string_pool(void) {
+  StringPoolNode* current = string_pool;
+  while (current != NULL) {
+    StringPoolNode* next = current->next;
+    free(current);
+    current = next;
+  }
+  string_pool = NULL;
+}
+
 ASTNode* ast_create_node(ASTNodeType type, int line) {
   ASTNode* node = (ASTNode*)calloc(1, sizeof(ASTNode));
   node->type = type;
@@ -31,7 +60,6 @@ TypeInfo* ast_create_type(BaseType base) {
 
 void ast_free_type(TypeInfo* type) {
   if (!type) return;
-  if (type->struct_name) free(type->struct_name);
   if (type->ptr_to) ast_free_type(type->ptr_to);
   free(type);
 }
@@ -52,7 +80,6 @@ void ast_free_node(ASTNode* node) {
     case AST_VAR_DECL:
     case AST_FUNC_DECL:
     case AST_STRUCT_DECL:
-      if (node->as.decl.name) free(node->as.decl.name);
       if (node->as.decl.var_type) ast_free_type(node->as.decl.var_type);
       if (node->as.decl.body) ast_free_node(node->as.decl.body);
       break;
@@ -87,11 +114,9 @@ void ast_free_node(ASTNode* node) {
 
     case AST_MEMBER_ACCESS:
       if (node->as.member.expr) ast_free_node(node->as.member.expr);
-      if (node->as.member.member_name) free(node->as.member.member_name);
       break;
 
     case AST_VAR_ACCESS:
-      if (node->as.var.name) free(node->as.var.name);
       break;
 
     case AST_PROGRAM:

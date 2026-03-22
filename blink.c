@@ -19,13 +19,9 @@ int main(void) {
   PORTC.DIRSET = 1 << 2;
   PORTA.DIRSET = 1 << 7;
   while (1) {
-    for (uint16_t i = 0; i < 20000; i++);
+    for (uint16_t i = 0; i < 30000; i++);
     if (count > 9) {
-      if (current == 0) {
-        current = 1;
-      } else {
-        current = 0;
-      }
+      current = !current;
       count = 0;
     }
     count = count + 1;

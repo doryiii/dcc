@@ -50,13 +50,13 @@ void codegen_set_emit_cb(void (*cb)(const char*)) { emit_cb = cb; }
 
 static void visit_struct_decl(ASTNode* node) {
   StructDef* sd = (StructDef*)calloc(1, sizeof(StructDef));
-  sd->name = strdup(node->as.decl.name);
+  sd->name = intern_string(node->as.decl.name);
   int offset = 0;
   
   ASTNode* mem_node = node->first_child;
   while (mem_node) {
     Member* m = (Member*)calloc(1, sizeof(Member));
-    m->name = strdup(mem_node->as.decl.name);
+    m->name = intern_string(mem_node->as.decl.name);
     m->offset = offset;
     m->type = mem_node->as.decl.var_type;
 
@@ -95,7 +95,7 @@ static Member* find_member(StructDef* sd, char* name) {
 
 static void push_symbol(char* name, int offset, TypeInfo* type) {
   Symbol* s = (Symbol*)malloc(sizeof(Symbol));
-  s->name = strdup(name);
+  s->name = intern_string(name);
   s->offset = offset;
   s->type = type;
   s->next = state.symbols;
@@ -115,7 +115,6 @@ static void clear_symbols() {
   Symbol* s = state.symbols;
   while (s) {
     Symbol* next = s->next;
-    free(s->name);
     free(s);
     s = next;
   }
@@ -389,6 +388,18 @@ static void visit_unary_op(ASTNode* node) {
       EMIT("    st Z, r24\n");
       EMIT("    std Z+1, r25\n");
     }
+  } else if (node->as.single_expr.op == TOK_NOT) {
+    visit(node->as.single_expr.expr);
+    int l_true = next_label();
+    int l_done = next_label();
+    EMIT("    or r24, r25\n");
+    EMIT("    breq L%d\n", l_true);
+    EMIT("    ldi r24, 0\n");
+    EMIT("    rjmp L%d\n", l_done);
+    EMIT("L%d:\n", l_true);
+    EMIT("    ldi r24, 1\n");
+    EMIT("L%d:\n", l_done);
+    EMIT("    clr r25\n");
   }
 }
 

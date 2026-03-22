@@ -502,6 +502,11 @@ int dasm_emit(const char* asm_line, uint32_t* out_inst) {
         int r = get_reg(args[1].text);
         op = 0x0C00 | ((r & 0x10) << 5) | ((d & 0x1F) << 4) | (r & 0x0F);
         encoded = true;
+      } else if (strcmp(mnemonic, "or") == 0) {
+        int d = get_reg(args[0].text);
+        int r = get_reg(args[1].text);
+        op = 0x2800 | ((r & 0x10) << 5) | ((d & 0x1F) << 4) | (r & 0x0F);
+        encoded = true;
       } else if (strcmp(mnemonic, "adc") == 0) {
         int d = get_reg(args[0].text);
         int r = get_reg(args[1].text);

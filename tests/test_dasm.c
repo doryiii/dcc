@@ -93,9 +93,32 @@ int test_dasm_labels() {
   return 0;
 }
 
+int test_dasm_or() {
+  const char* source = "or r24, r25\n";
+  uint8_t buffer[1024] = {0};
+  uint32_t len;
+  assemble_string(source, buffer, &len);
+
+  uint16_t* code = (uint16_t*)buffer;
+  // 0x2800 | ((25 & 0x10) << 5) | ((24 & 0x1F) << 4) | (25 & 0x0F)
+  // 0x2800 | 0x0200 | 0x0180 | 0x0009 = 0x2B89
+  if (code[0] != 0x2B89) {
+    fprintf(
+        stderr,
+        "FAIL: test_dasm_or: or r24, r25 expected 0x2B89, got 0x%04X\n",
+        code[0]
+    );
+    return 1;
+  }
+
+  printf("PASS: test_dasm_or\n");
+  return 0;
+}
+
 int main() {
   int failed = 0;
   failed += test_dasm_basic();
   failed += test_dasm_labels();
+  failed += test_dasm_or();
   return failed > 0 ? 1 : 0;
 }

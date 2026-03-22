@@ -48,7 +48,7 @@ static TypeInfo* parse_type() {
     advance_token();
     t = ast_create_type(TYPE_STRUCT);
     if (check(TOK_IDENTIFIER)) {
-      t->struct_name = strdup(current_token.text);
+      t->struct_name = intern_string(current_token.text);
       advance_token();
     } else {
       fprintf(stderr, "Error: Expected struct name\n");
@@ -76,7 +76,7 @@ static ASTNode* parse_primary() {
     advance_token();
   } else if (check(TOK_IDENTIFIER)) {
     node = ast_create_node(AST_VAR_ACCESS, current_token.line);
-    node->as.var.name = strdup(current_token.text);
+    node->as.var.name = intern_string(current_token.text);
     advance_token();
   } else if (check(TOK_LPAREN)) {
     advance_token();
@@ -110,7 +110,7 @@ static ASTNode* parse_postfix() {
       ASTNode* access = ast_create_node(AST_MEMBER_ACCESS, current_token.line);
       access->as.member.expr = node;
       if (check(TOK_IDENTIFIER)) {
-        access->as.member.member_name = strdup(current_token.text);
+        access->as.member.member_name = intern_string(current_token.text);
         advance_token();
       } else {
         fprintf(stderr, "Error: Expected field name after '.'\n");
@@ -296,7 +296,7 @@ static ASTNode* parse_block() {
       ASTNode* decl = ast_create_node(AST_VAR_DECL, current_token.line);
       decl->as.decl.var_type = t;
       if (check(TOK_IDENTIFIER)) {
-        decl->as.decl.name = strdup(current_token.text);
+        decl->as.decl.name = intern_string(current_token.text);
         advance_token();
       } else {
         fprintf(stderr, "Error: Expected identifier in var decl\n");
@@ -307,7 +307,7 @@ static ASTNode* parse_block() {
         ASTNode* assign = ast_create_node(AST_ASSIGN, current_token.line);
         ASTNode* var_access =
             ast_create_node(AST_VAR_ACCESS, current_token.line);
-        var_access->as.var.name = strdup(decl->as.decl.name);
+        var_access->as.var.name = intern_string(decl->as.decl.name);
         assign->as.binary.left = var_access;
         assign->as.binary.right = parse_expr();
         ast_add_child(
@@ -355,14 +355,14 @@ static ASTNode* parse_statement() {
       // For loop init is a declaration
       ASTNode* decl = ast_create_node(AST_VAR_DECL, current_token.line);
       decl->as.decl.var_type = init_type;
-      decl->as.decl.name = strdup(current_token.text);
+      decl->as.decl.name = intern_string(current_token.text);
       match(TOK_IDENTIFIER);
       if (check(TOK_ASSIGN)) {
         advance_token();
         ASTNode* assign = ast_create_node(AST_ASSIGN, current_token.line);
         ASTNode* var_access =
             ast_create_node(AST_VAR_ACCESS, current_token.line);
-        var_access->as.var.name = strdup(decl->as.decl.name);
+        var_access->as.var.name = intern_string(decl->as.decl.name);
         assign->as.binary.left = var_access;
         assign->as.binary.right = parse_expr();
         ast_add_child(decl, assign);
@@ -411,7 +411,7 @@ static ASTNode* parse_declaration() {
     if (check(TOK_LBRACE)) {
       // Struct declaration
       ASTNode* node = ast_create_node(AST_STRUCT_DECL, current_token.line);
-      node->as.decl.name = strdup(t->struct_name);
+      node->as.decl.name = intern_string(t->struct_name);
       ast_free_type(t);
       match(TOK_LBRACE);
       while (!check(TOK_RBRACE) && !check(TOK_EOF)) {
@@ -423,7 +423,7 @@ static ASTNode* parse_declaration() {
         ASTNode* mem = ast_create_node(AST_VAR_DECL, current_token.line);
         mem->as.decl.var_type = mem_type;
         if (check(TOK_IDENTIFIER)) {
-          mem->as.decl.name = strdup(current_token.text);
+          mem->as.decl.name = intern_string(current_token.text);
           advance_token();
         } else {
           fprintf(stderr, "Error: expected identifier in struct member\n");
@@ -462,7 +462,7 @@ static ASTNode* parse_declaration() {
   }
 
   if (check(TOK_IDENTIFIER)) {
-    char* name = strdup(current_token.text);
+    char* name = intern_string(current_token.text);
     advance_token();
 
     if (check(TOK_LPAREN)) {
@@ -483,7 +483,7 @@ static ASTNode* parse_declaration() {
           ASTNode* pdecl = ast_create_node(AST_VAR_DECL, current_token.line);
           pdecl->as.decl.var_type = ptype;
           if (check(TOK_IDENTIFIER)) {
-            pdecl->as.decl.name = strdup(current_token.text);
+            pdecl->as.decl.name = intern_string(current_token.text);
             advance_token();
           } else {
             fprintf(stderr, "Error: expected parameter name\n");

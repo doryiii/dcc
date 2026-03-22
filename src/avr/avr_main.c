@@ -184,6 +184,7 @@ int main(void) {
   printf_P(PSTR("Free RAM after fixup: %u bytes\r\n"), get_free_ram());
 
   ast_free_node(ast);
+  ast_free_string_pool();
 
   printf_P(PSTR("Done! Program size: %u\r\n"), (uint16_t)(avr_pc - APP_START));
   printf_P(PSTR("Jumping to app...\r\n"));

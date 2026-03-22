@@ -111,6 +111,10 @@ TypeInfo* ast_create_type(BaseType base);
 void ast_free_node(ASTNode* node);
 void ast_free_type(TypeInfo* type);
 
+// String Pool
+char* intern_string(const char* str);
+void ast_free_string_pool(void);
+
 // Debug
 void ast_print(ASTNode* node, int indent);
 

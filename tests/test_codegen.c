@@ -114,10 +114,37 @@ int test_codegen_if_and_comparisons() {
   return 0;
 }
 
+int test_codegen_not() {
+  const char* source =
+      "int main(void) {\n"
+      "  uint8_t a = 1;\n"
+      "  a = !a;\n"
+      "}";
+  test_src = source;
+  ASTNode* ast = parse_program(test_getchar);
+
+  char buffer[4096];
+  out_file = fmemopen(buffer, sizeof(buffer), "w");
+  codegen_set_emit_cb(file_emit_cb);
+  codegen(ast);
+  fclose(out_file);
+  out_file = NULL;
+
+  if (strstr(buffer, "or r24, r25") == NULL) {
+    fprintf(stderr, "FAIL: test_codegen_not: expected 'or r24, r25' in output\n");
+    return 1;
+  }
+
+  ast_free_node(ast);
+  printf("PASS: test_codegen_not\n");
+  return 0;
+}
+
 int main() {
   int failed = 0;
   failed += test_codegen_main_return();
   failed += test_codegen_struct_access();
   failed += test_codegen_if_and_comparisons();
+  failed += test_codegen_not();
   return failed > 0 ? 1 : 0;
 }
