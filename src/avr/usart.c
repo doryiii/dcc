@@ -1,5 +1,6 @@
 #include "usart.h"
 
+#include <stdio.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
@@ -18,6 +19,24 @@ volatile USART_t* dev[3] = {
     (USART_t*)0x0820,
     (USART_t*)0x0840,
 };
+
+static uint8_t usart_console;
+
+static int usart_putc_f(char c, FILE *stream) {
+  if (c == '\n') {
+    usart_putc(usart_console, '\r');
+  }
+  usart_putc(usart_console, c);
+  return 0;
+}
+
+static FILE usart_stdout = FDEV_SETUP_STREAM(usart_putc_f, NULL, _FDEV_SETUP_WRITE);
+
+void usart_console_init(uint8_t n, uint32_t baud) {
+  usart_console = n;
+  usart_init(n, baud);
+  stdout = &usart_stdout;
+}
 
 void usart_init(uint8_t n, uint32_t baud) {
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {

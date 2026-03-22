@@ -3,6 +3,7 @@
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <util/delay.h>
@@ -104,8 +105,7 @@ static uint32_t avr_pc = APP_START;
 static uint8_t current_page_buf[PROGMEM_PAGE_SIZE];
 
 static void avr_emit_cb(const char* line) {
-  usart_print(2, line);
-  usart_putc(2, '\r');
+  printf_P(PSTR("%s\r"), line);
   uint32_t inst;
   int len = dasm_emit(line, &inst);
   if (len > 0) {
@@ -134,13 +134,13 @@ int main(void) {
   ccp_write_io((void*)&CPUINT.CTRLA, CPUINT_IVSEL_bm);
 
   set_clock();
-  usart_init(2, 9600);
+  usart_console_init(2, 9600);
 
   // Global interrupts enable
   sei();
 
   _delay_ms(1000);
-  usart_print_P(2, PSTR("Enter C source ending with EOT or NULL.\r\n"));
+  printf_P(PSTR("Enter C source ending with EOT or NULL.\r\n"));
   memset(current_page_buf, 0xFF, PROGMEM_PAGE_SIZE);
   avr_pc = APP_START;
 
@@ -148,7 +148,7 @@ int main(void) {
   preprocessor_init(avr_getchar);
   ASTNode* ast = parse_program(preprocessor_getchar);
 
-  usart_print_P(2, PSTR("Parsing done. Generating code...\r\n"));
+  printf_P(PSTR("Parsing done. Generating code...\r\n"));
   codegen_set_emit_cb(avr_emit_cb);
   codegen(ast);
 
@@ -158,12 +158,13 @@ int main(void) {
     write_page(avr_pc - offset, current_page_buf);
   }
 
-  usart_print_P(2, PSTR("Code generation done. Applying fixups...\r\n"));
+  printf_P(PSTR("Program size: %u\r\n"), (uint16_t)(avr_pc - APP_START));
+  printf_P(PSTR("Code generation done. Applying fixups...\r\n"));
   dasm_apply_fixups(dasm_read_page_cb, dasm_write_page_cb);
 
   ast_free_node(ast);
 
-  usart_print_P(2, PSTR("Done! Jumping to app...\r\n"));
+  printf_P(PSTR("Done! Jumping to app...\r\n"));
   usart_tx_flush(2);
   _delay_ms(1000);
 

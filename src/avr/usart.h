@@ -5,6 +5,7 @@
 
 #define USART_BUFSIZE 16
 
+void usart_console_init(uint8_t n, uint32_t baud);
 void usart_init(uint8_t n, uint32_t baud);
 void usart_putc(uint8_t n, char c);
 void usart_print(uint8_t n, const char* c);
