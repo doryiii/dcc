@@ -50,22 +50,25 @@ void codegen_set_emit_cb(void (*cb)(const char*)) { emit_cb = cb; }
 
 static void visit_struct_decl(ASTNode* node) {
   StructDef* sd = (StructDef*)calloc(1, sizeof(StructDef));
-  sd->name = strdup(node->name);
+  sd->name = strdup(node->as.decl.name);
   int offset = 0;
-  for (int i = 0; i < node->num_children; i++) {
-    ASTNode* mem_node = node->children[i];
+  
+  ASTNode* mem_node = node->first_child;
+  while (mem_node) {
     Member* m = (Member*)calloc(1, sizeof(Member));
-    m->name = strdup(mem_node->name);
+    m->name = strdup(mem_node->as.decl.name);
     m->offset = offset;
-    m->type = mem_node->var_type;
+    m->type = mem_node->as.decl.var_type;
 
     int element_size = 1;
     if (m->type && (m->type->base == TYPE_UINT16 || m->type->base == TYPE_INT))
       element_size = 2;
 
-    offset += element_size * mem_node->array_size;
+    offset += element_size * mem_node->as.decl.array_size;
     m->next = sd->members;
     sd->members = m;
+    
+    mem_node = mem_node->next_sibling;
   }
   sd->size = offset;
   sd->next = state.structs;
@@ -130,8 +133,10 @@ static void visit_program(ASTNode* node) {
   EMIT("    out 0x3D, r28 ; SPL\n");
   EMIT("    out 0x3E, r29 ; SPH\n\n");
 
-  for (int i = 0; i < node->num_children; i++) {
-    visit(node->children[i]);
+  ASTNode* child = node->first_child;
+  while (child) {
+    visit(child);
+    child = child->next_sibling;
   }
 }
 
@@ -140,38 +145,46 @@ static int calculate_stack_size(ASTNode* node) {
   int size = 0;
   if (node->type == AST_VAR_DECL) {
     size = 1;
-    if (node->var_type && (node->var_type->base == TYPE_UINT16 ||
-                           node->var_type->base == TYPE_INT))
+    if (node->as.decl.var_type && (node->as.decl.var_type->base == TYPE_UINT16 ||
+                           node->as.decl.var_type->base == TYPE_INT))
       size = 2;
   }
 
-  for (int i = 0; i < node->num_children; i++) {
-    size += calculate_stack_size(node->children[i]);
+  ASTNode* child = node->first_child;
+  while (child) {
+    size += calculate_stack_size(child);
+    child = child->next_sibling;
   }
-  if (node->body) size += calculate_stack_size(node->body);
-  if (node->then_branch) size += calculate_stack_size(node->then_branch);
-  if (node->else_branch) size += calculate_stack_size(node->else_branch);
-  if (node->init && node->init->type == AST_VAR_DECL)
-    size += calculate_stack_size(node->init);
+  
+  if (node->type == AST_FUNC_DECL && node->as.decl.body) size += calculate_stack_size(node->as.decl.body);
+  if (node->type == AST_IF) {
+    if (node->as.if_stmt.then_branch) size += calculate_stack_size(node->as.if_stmt.then_branch);
+    if (node->as.if_stmt.else_branch) size += calculate_stack_size(node->as.if_stmt.else_branch);
+  }
+  if ((node->type == AST_WHILE || node->type == AST_FOR) && node->as.loop.body) size += calculate_stack_size(node->as.loop.body);
+  if (node->type == AST_FOR && node->as.loop.init && node->as.loop.init->type == AST_VAR_DECL)
+    size += calculate_stack_size(node->as.loop.init);
 
   return size;
 }
 
 static void visit_func_decl(ASTNode* node) {
   clear_symbols();
-  int total_stack = calculate_stack_size(node->body);
-  if (node->num_children > 0) {  // parameters
-    for (int i = 0; i < node->num_children; i++)
-      total_stack += calculate_stack_size(node->children[i]);
+  int total_stack = calculate_stack_size(node->as.decl.body);
+  
+  ASTNode* child = node->first_child;
+  while (child) {
+    total_stack += calculate_stack_size(child);
+    child = child->next_sibling;
   }
 
   state.stack_offset = 1;
   char end_label[32];
-  sprintf(end_label, "L_end_%s", node->name);
+  sprintf(end_label, "L_end_%s", node->as.decl.name);
   state.current_func_end_label = end_label;
 
-  EMIT(".global %s\n", node->name);
-  EMIT("%s:\n", node->name);
+  EMIT(".global %s\n", node->as.decl.name);
+  EMIT("%s:\n", node->as.decl.name);
 
   // Function Prologue
   EMIT("    push r28\n");
@@ -189,8 +202,8 @@ static void visit_func_decl(ASTNode* node) {
   }
 
   // Body
-  if (node->body) {
-    visit(node->body);
+  if (node->as.decl.body) {
+    visit(node->as.decl.body);
   }
 
   // Epilogue
@@ -208,22 +221,22 @@ static void visit_func_decl(ASTNode* node) {
 
 static void visit_var_decl(ASTNode* node) {
   int size = 1;
-  if (node->var_type &&
-      (node->var_type->base == TYPE_UINT16 || node->var_type->base == TYPE_INT))
+  if (node->as.decl.var_type &&
+      (node->as.decl.var_type->base == TYPE_UINT16 || node->as.decl.var_type->base == TYPE_INT))
     size = 2;
 
-  push_symbol(node->name, state.stack_offset, node->var_type);
+  push_symbol(node->as.decl.name, state.stack_offset, node->as.decl.var_type);
   state.stack_offset += size;
 
-  if (node->num_children > 0) {
-    visit(node->children[0]);
+  if (node->first_child) {
+    visit(node->first_child);
   }
 }
 
 static void visit_var_access(ASTNode* node) {
-  Symbol* s = find_symbol(node->name);
+  Symbol* s = find_symbol(node->as.var.name);
   if (!s) {
-    fprintf(stderr, "Codegen error: variable %s not found\n", node->name);
+    fprintf(stderr, "Codegen error: variable %s not found\n", node->as.var.name);
     return;
   }
 
@@ -244,21 +257,21 @@ static TypeInfo* get_expr_type(ASTNode* node) {
   if (!node) return NULL;
   switch (node->type) {
     case AST_VAR_ACCESS: {
-      Symbol* s = find_symbol(node->name);
+      Symbol* s = find_symbol(node->as.var.name);
       if (s) return s->type;
       break;
     }
     case AST_CAST:
-      return node->var_type;
+      return node->as.single_expr.var_type;
     case AST_MEMBER_ACCESS: {
-      TypeInfo* t = get_expr_type(node->expr);
+      TypeInfo* t = get_expr_type(node->as.member.expr);
       if (t) {
         if (t->base == TYPE_POINTER)
           t = t->ptr_to;  // Handle ptr->member (though we only have . for now)
         if (t->base == TYPE_STRUCT) {
           StructDef* sd = find_struct(t->struct_name);
           if (sd) {
-            Member* m = find_member(sd, node->member_name);
+            Member* m = find_member(sd, node->as.member.member_name);
             if (m) return m->type;
           }
         }
@@ -266,8 +279,8 @@ static TypeInfo* get_expr_type(ASTNode* node) {
       break;
     }
     case AST_UNARY_OP:
-      if (node->op == TOK_STAR) {
-        TypeInfo* t = get_expr_type(node->expr);
+      if (node->as.single_expr.op == TOK_STAR) {
+        TypeInfo* t = get_expr_type(node->as.single_expr.expr);
         if (t && t->base == TYPE_POINTER) return t->ptr_to;
         if (t && t->base == TYPE_STRUCT)
           return t;  // Lenient handling for the user's specific syntax
@@ -281,24 +294,24 @@ static TypeInfo* get_expr_type(ASTNode* node) {
 
 static void visit_lvalue(ASTNode* node) {
   if (node->type == AST_VAR_ACCESS) {
-    Symbol* s = find_symbol(node->name);
+    Symbol* s = find_symbol(node->as.var.name);
     if (s) {
       EMIT("    movw r30, r28\n");
       if (s->offset > 0) EMIT("    adiw r30, %d\n", s->offset);
     } else {
-      EMIT("    ldi r30, lo8(%s)\n", node->name);
-      EMIT("    ldi r31, hi8(%s)\n", node->name);
+      EMIT("    ldi r30, lo8(%s)\n", node->as.var.name);
+      EMIT("    ldi r31, hi8(%s)\n", node->as.var.name);
     }
-  } else if (node->type == AST_UNARY_OP && node->op == TOK_STAR) {
-    visit(node->expr);
+  } else if (node->type == AST_UNARY_OP && node->as.single_expr.op == TOK_STAR) {
+    visit(node->as.single_expr.expr);
     EMIT("    movw r30, r24\n");
   } else if (node->type == AST_MEMBER_ACCESS) {
-    TypeInfo* t = get_expr_type(node->expr);
-    visit_lvalue(node->expr);  // Get base address in Z
+    TypeInfo* t = get_expr_type(node->as.member.expr);
+    visit_lvalue(node->as.member.expr);  // Get base address in Z
     if (t && t->base == TYPE_STRUCT) {
       StructDef* sd = find_struct(t->struct_name);
       if (sd) {
-        Member* m = find_member(sd, node->member_name);
+        Member* m = find_member(sd, node->as.member.member_name);
         if (m && m->offset > 0) {
           EMIT("    adiw r30, %d\n", m->offset);
         }
@@ -308,16 +321,16 @@ static void visit_lvalue(ASTNode* node) {
 }
 
 static void visit_assign(ASTNode* node) {
-  visit(node->right);  // Result in r24:r25
+  visit(node->as.binary.right);  // Result in r24:r25
   EMIT("    push r24\n");
   EMIT("    push r25\n");
 
-  visit_lvalue(node->left);  // Address in Z (r30:r31)
+  visit_lvalue(node->as.binary.left);  // Address in Z (r30:r31)
 
   EMIT("    pop r25\n");
   EMIT("    pop r24\n");
 
-  TypeInfo* t = get_expr_type(node->left);
+  TypeInfo* t = get_expr_type(node->as.binary.left);
   int size = 1;
   if (t && (t->base == TYPE_UINT16 || t->base == TYPE_INT ||
             t->base == TYPE_POINTER))
@@ -332,8 +345,8 @@ static void visit_assign(ASTNode* node) {
 }
 
 static void visit_unary_op(ASTNode* node) {
-  if (node->op == TOK_STAR) {
-    visit(node->expr);  // address in r24:r25
+  if (node->as.single_expr.op == TOK_STAR) {
+    visit(node->as.single_expr.expr);  // address in r24:r25
     EMIT("    movw r30, r24\n");
     TypeInfo* t = get_expr_type(node);
     int size = 1;
@@ -347,12 +360,12 @@ static void visit_unary_op(ASTNode* node) {
       EMIT("    ld r24, Z\n");
       EMIT("    ldd r25, Z+1\n");
     }
-  } else if (node->op == TOK_AMP) {
-    visit_lvalue(node->expr);
+  } else if (node->as.single_expr.op == TOK_AMP) {
+    visit_lvalue(node->as.single_expr.expr);
     EMIT("    movw r24, r30\n");
-  } else if (node->op == TOK_INC || node->op == TOK_DEC) {
-    visit_lvalue(node->expr);  // address in Z
-    TypeInfo* t = get_expr_type(node->expr);
+  } else if (node->as.single_expr.op == TOK_INC || node->as.single_expr.op == TOK_DEC) {
+    visit_lvalue(node->as.single_expr.expr);  // address in Z
+    TypeInfo* t = get_expr_type(node->as.single_expr.expr);
     int size = 1;
     if (t && (t->base == TYPE_UINT16 || t->base == TYPE_INT ||
               t->base == TYPE_POINTER))
@@ -360,7 +373,7 @@ static void visit_unary_op(ASTNode* node) {
 
     if (size == 1) {
       EMIT("    ld r24, Z\n");
-      if (node->op == TOK_INC)
+      if (node->as.single_expr.op == TOK_INC)
         EMIT("    inc r24\n");
       else
         EMIT("    dec r24\n");
@@ -368,7 +381,7 @@ static void visit_unary_op(ASTNode* node) {
     } else {
       EMIT("    ld r24, Z\n");
       EMIT("    ldd r25, Z+1\n");
-      if (node->op == TOK_INC) {
+      if (node->as.single_expr.op == TOK_INC) {
         EMIT("    adiw r24, 1\n");
       } else {
         EMIT("    sbiw r24, 1\n");
@@ -379,22 +392,22 @@ static void visit_unary_op(ASTNode* node) {
   }
 }
 
-static void visit_cast(ASTNode* node) { visit(node->expr); }
+static void visit_cast(ASTNode* node) { visit(node->as.single_expr.expr); }
 
 static void visit_if(ASTNode* node) {
   int l_end = next_label();
-  int l_else = node->else_branch ? next_label() : l_end;
+  int l_else = node->as.if_stmt.else_branch ? next_label() : l_end;
 
-  visit(node->cond);
+  visit(node->as.if_stmt.cond);
   EMIT("    tst r24\n");
   EMIT("    breq L%d\n", l_else);
 
-  visit(node->then_branch);
+  visit(node->as.if_stmt.then_branch);
 
-  if (node->else_branch) {
+  if (node->as.if_stmt.else_branch) {
     EMIT("    rjmp L%d\n", l_end);
     EMIT("L%d:\n", l_else);
-    visit(node->else_branch);
+    visit(node->as.if_stmt.else_branch);
   }
   EMIT("L%d:\n", l_end);
 }
@@ -404,46 +417,46 @@ static void visit_while(ASTNode* node) {
   int l_end = next_label();
 
   EMIT("L%d:\n", l_start);
-  visit(node->cond);
+  visit(node->as.loop.cond);
   // If r24 is 0, jump to end
   EMIT("    tst r24\n");
   EMIT("    breq L%d\n", l_end);
 
-  visit(node->body);
+  visit(node->as.loop.body);
   EMIT("    rjmp L%d\n", l_start);
   EMIT("L%d:\n", l_end);
 }
 
 static void visit_for(ASTNode* node) {
-  if (node->init) visit(node->init);
+  if (node->as.loop.init) visit(node->as.loop.init);
 
   int l_start = next_label();
   int l_end = next_label();
 
   EMIT("L%d:\n", l_start);
-  if (node->cond) {
-    visit(node->cond);
+  if (node->as.loop.cond) {
+    visit(node->as.loop.cond);
     EMIT("    tst r24\n");
     EMIT("    breq L%d\n", l_end);
   }
 
-  visit(node->body);
-  if (node->inc) visit(node->inc);
+  visit(node->as.loop.body);
+  if (node->as.loop.inc) visit(node->as.loop.inc);
 
   EMIT("    rjmp L%d\n", l_start);
   EMIT("L%d:\n", l_end);
 }
 
 static void visit_binary_op(ASTNode* node) {
-  visit(node->right);
+  visit(node->as.binary.right);
   EMIT("    push r24\n");
   EMIT("    push r25\n");
 
-  visit(node->left);
+  visit(node->as.binary.left);
   EMIT("    pop r23\n");  // Right high
   EMIT("    pop r22\n");  // Right low
 
-  switch (node->op) {
+  switch (node->as.binary.op) {
     case TOK_PLUS:
       EMIT("    add r24, r22\n");
       EMIT("    adc r25, r23\n");
@@ -553,25 +566,27 @@ static void visit_binary_op(ASTNode* node) {
 }
 
 static void visit_block(ASTNode* node) {
-  for (int i = 0; i < node->num_children; i++) {
-    visit(node->children[i]);
+  ASTNode* child = node->first_child;
+  while (child) {
+    visit(child);
+    child = child->next_sibling;
   }
 }
 
 static void visit_number(ASTNode* node) {
-  EMIT("    ldi r24, 0x%02X\n", node->int_val & 0xFF);
-  EMIT("    ldi r25, 0x%02X\n", (node->int_val >> 8) & 0xFF);
+  EMIT("    ldi r24, 0x%02X\n", node->as.number.int_val & 0xFF);
+  EMIT("    ldi r25, 0x%02X\n", (node->as.number.int_val >> 8) & 0xFF);
 }
 
 static void visit_return(ASTNode* node) {
-  if (node->expr) {
-    visit(node->expr);
+  if (node->as.single_expr.expr) {
+    visit(node->as.single_expr.expr);
   }
   EMIT("    rjmp %s\n", state.current_func_end_label);
 }
 
 static void visit_expr_stmt(ASTNode* node) {
-  if (node->expr) visit(node->expr);
+  if (node->as.single_expr.expr) visit(node->as.single_expr.expr);
 }
 
 static void visit(ASTNode* node) {

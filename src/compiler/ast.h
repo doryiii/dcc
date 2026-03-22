@@ -2,6 +2,7 @@
 #define AST_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef enum {
   TYPE_VOID,
@@ -18,7 +19,7 @@ typedef struct TypeInfo {
   struct TypeInfo* ptr_to;  // if base == TYPE_POINTER
 } TypeInfo;
 
-typedef enum {
+typedef enum : uint8_t {
   AST_PROGRAM,
   AST_VAR_DECL,
   AST_STRUCT_DECL,
@@ -39,52 +40,66 @@ typedef enum {
 } ASTNodeType;
 
 typedef struct ASTNode {
+  struct ASTNode* first_child;
+  struct ASTNode* next_sibling;
+
+  uint16_t line;
   ASTNodeType type;
-  int line;
 
-  // For AST_VAR_DECL, AST_FUNC_DECL, AST_STRUCT_DECL
-  char* name;
-  TypeInfo* var_type;
+  union {
+    // For AST_VAR_DECL, AST_FUNC_DECL, AST_STRUCT_DECL
+    struct {
+      char* name;
+      TypeInfo* var_type;
+      struct ASTNode* body; // For AST_FUNC_DECL
+      int array_size;       // For arrays in structs
+    } decl;
 
-  // For AST_PROGRAM, AST_BLOCK, AST_STRUCT_DECL (members), AST_FUNC_DECL
-  // (params)
-  struct ASTNode** children;
-  int num_children;
-  int capacity;
+    // For AST_IF
+    struct {
+      struct ASTNode* cond;
+      struct ASTNode* then_branch;
+      struct ASTNode* else_branch;
+    } if_stmt;
 
-  // For AST_FUNC_DECL
-  struct ASTNode* body;
+    // For AST_WHILE, AST_FOR
+    struct {
+      struct ASTNode* init;
+      struct ASTNode* cond;
+      struct ASTNode* inc;
+      struct ASTNode* body;
+    } loop;
 
-  // For AST_IF
-  struct ASTNode* cond;
-  struct ASTNode* then_branch;
-  struct ASTNode* else_branch;
+    // For AST_RETURN, AST_EXPR_STMT, AST_UNARY_OP, AST_CAST
+    struct {
+      struct ASTNode* expr;
+      int op;             // Unary/Binary op token type
+      TypeInfo* var_type; // For AST_CAST
+    } single_expr;
 
-  // For AST_WHILE, AST_FOR
-  // cond and body reused from above
-  struct ASTNode* init;
-  struct ASTNode* inc;
+    // For AST_ASSIGN, AST_BINARY_OP
+    struct {
+      struct ASTNode* left;
+      struct ASTNode* right;
+      int op;
+    } binary;
 
-  // For AST_RETURN, AST_EXPR_STMT, AST_UNARY_OP, AST_CAST
-  struct ASTNode* expr;
-  int op;  // Unary/Binary op token type (e.g., TOK_STAR, TOK_PLUS)
+    // For AST_MEMBER_ACCESS
+    struct {
+      struct ASTNode* expr; // The object being accessed
+      char* member_name;
+    } member;
 
-  // For AST_ASSIGN, AST_BINARY_OP
-  struct ASTNode* left;
-  struct ASTNode* right;
+    // For AST_VAR_ACCESS
+    struct {
+      char* name;
+    } var;
 
-  // For AST_MEMBER_ACCESS
-  char* member_name;
-
-  // For AST_VAR_ACCESS
-  // name reused
-
-  // For AST_NUMBER
-  int int_val;
-
-  // For arrays in structs
-  int array_size;
-
+    // For AST_NUMBER
+    struct {
+      int int_val;
+    } number;
+  } as;
 } ASTNode;
 
 // Node creation

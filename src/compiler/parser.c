@@ -72,11 +72,11 @@ static ASTNode* parse_primary() {
   ASTNode* node = NULL;
   if (check(TOK_NUMBER)) {
     node = ast_create_node(AST_NUMBER, current_token.line);
-    node->int_val = strtol(current_token.text, NULL, 0);  // Handles 0x
+    node->as.number.int_val = strtol(current_token.text, NULL, 0);  // Handles 0x
     advance_token();
   } else if (check(TOK_IDENTIFIER)) {
     node = ast_create_node(AST_VAR_ACCESS, current_token.line);
-    node->name = strdup(current_token.text);
+    node->as.var.name = strdup(current_token.text);
     advance_token();
   } else if (check(TOK_LPAREN)) {
     advance_token();
@@ -86,8 +86,8 @@ static ASTNode* parse_primary() {
     if (cast_type) {
       match(TOK_RPAREN);
       node = ast_create_node(AST_CAST, current_token.line);
-      node->var_type = cast_type;
-      node->expr = parse_expr();
+      node->as.single_expr.var_type = cast_type;
+      node->as.single_expr.expr = parse_expr();
     } else {
       node = parse_expr();
       match(TOK_RPAREN);
@@ -108,9 +108,9 @@ static ASTNode* parse_postfix() {
     if (check(TOK_DOT)) {
       advance_token();
       ASTNode* access = ast_create_node(AST_MEMBER_ACCESS, current_token.line);
-      access->expr = node;
+      access->as.member.expr = node;
       if (check(TOK_IDENTIFIER)) {
-        access->member_name = strdup(current_token.text);
+        access->as.member.member_name = strdup(current_token.text);
         advance_token();
       } else {
         fprintf(stderr, "Error: Expected field name after '.'\n");
@@ -119,8 +119,8 @@ static ASTNode* parse_postfix() {
       node = access;
     } else if (check(TOK_INC) || check(TOK_DEC)) {
       ASTNode* post = ast_create_node(AST_UNARY_OP, current_token.line);
-      post->op = current_token.type;
-      post->expr = node;
+      post->as.single_expr.op = current_token.type;
+      post->as.single_expr.expr = node;
       advance_token();
       node = post;
     } else {
@@ -134,27 +134,22 @@ static ASTNode* parse_unary() {
   if (check(TOK_STAR) || check(TOK_AMP) || check(TOK_INC) || check(TOK_DEC) ||
       check(TOK_MINUS) || check(TOK_NOT)) {
     ASTNode* node = ast_create_node(AST_UNARY_OP, current_token.line);
-    node->op = current_token.type;
+    node->as.single_expr.op = current_token.type;
     advance_token();
-    node->expr = parse_unary();
+    node->as.single_expr.expr = parse_unary();
     return node;
   }
   return parse_postfix();
 }
 
-// Pratt parser style for binary ops would be better, but simple recursive
-// descent works: primary -> postfix -> unary -> multiplicative -> additive ->
-// shift -> relational -> equality -> bitwise and -> bitwise xor -> bitwise or
-// -> logical and -> logical or -> assignment
-
 static ASTNode* parse_multiplicative() {
   ASTNode* left = parse_unary();
   while (check(TOK_STAR) || check(TOK_SLASH)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_unary();
+    node->as.binary.right = parse_unary();
     left = node;
   }
   return left;
@@ -164,10 +159,10 @@ static ASTNode* parse_additive() {
   ASTNode* left = parse_multiplicative();
   while (check(TOK_PLUS) || check(TOK_MINUS)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_multiplicative();
+    node->as.binary.right = parse_multiplicative();
     left = node;
   }
   return left;
@@ -177,10 +172,10 @@ static ASTNode* parse_shift() {
   ASTNode* left = parse_additive();
   while (check(TOK_LSHIFT) || check(TOK_RSHIFT)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_additive();
+    node->as.binary.right = parse_additive();
     left = node;
   }
   return left;
@@ -190,10 +185,10 @@ static ASTNode* parse_relational() {
   ASTNode* left = parse_shift();
   while (check(TOK_LT) || check(TOK_GT) || check(TOK_LE) || check(TOK_GE)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_shift();
+    node->as.binary.right = parse_shift();
     left = node;
   }
   return left;
@@ -203,10 +198,10 @@ static ASTNode* parse_equality() {
   ASTNode* left = parse_relational();
   while (check(TOK_EQ) || check(TOK_NEQ)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_relational();
+    node->as.binary.right = parse_relational();
     left = node;
   }
   return left;
@@ -216,10 +211,10 @@ static ASTNode* parse_bitwise_and() {
   ASTNode* left = parse_equality();
   while (check(TOK_AMP)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_equality();
+    node->as.binary.right = parse_equality();
     left = node;
   }
   return left;
@@ -229,10 +224,10 @@ static ASTNode* parse_bitwise_xor() {
   ASTNode* left = parse_bitwise_and();
   while (check(TOK_BIT_XOR)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_bitwise_and();
+    node->as.binary.right = parse_bitwise_and();
     left = node;
   }
   return left;
@@ -242,10 +237,10 @@ static ASTNode* parse_bitwise_or() {
   ASTNode* left = parse_bitwise_xor();
   while (check(TOK_BIT_OR)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_bitwise_xor();
+    node->as.binary.right = parse_bitwise_xor();
     left = node;
   }
   return left;
@@ -255,10 +250,10 @@ static ASTNode* parse_logical_and() {
   ASTNode* left = parse_bitwise_or();
   while (check(TOK_LOG_AND)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_bitwise_or();
+    node->as.binary.right = parse_bitwise_or();
     left = node;
   }
   return left;
@@ -268,10 +263,10 @@ static ASTNode* parse_logical_or() {
   ASTNode* left = parse_logical_and();
   while (check(TOK_LOG_OR)) {
     ASTNode* node = ast_create_node(AST_BINARY_OP, current_token.line);
-    node->op = current_token.type;
-    node->left = left;
+    node->as.binary.op = current_token.type;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_logical_and();
+    node->as.binary.right = parse_logical_and();
     left = node;
   }
   return left;
@@ -281,9 +276,9 @@ static ASTNode* parse_assignment() {
   ASTNode* left = parse_logical_or();
   if (check(TOK_ASSIGN)) {
     ASTNode* node = ast_create_node(AST_ASSIGN, current_token.line);
-    node->left = left;
+    node->as.binary.left = left;
     advance_token();
-    node->right = parse_assignment();  // right-associative
+    node->as.binary.right = parse_assignment();  // right-associative
     return node;
   }
   return left;
@@ -299,9 +294,9 @@ static ASTNode* parse_block() {
     if (t) {
       // Var decl
       ASTNode* decl = ast_create_node(AST_VAR_DECL, current_token.line);
-      decl->var_type = t;
+      decl->as.decl.var_type = t;
       if (check(TOK_IDENTIFIER)) {
-        decl->name = strdup(current_token.text);
+        decl->as.decl.name = strdup(current_token.text);
         advance_token();
       } else {
         fprintf(stderr, "Error: Expected identifier in var decl\n");
@@ -312,9 +307,9 @@ static ASTNode* parse_block() {
         ASTNode* assign = ast_create_node(AST_ASSIGN, current_token.line);
         ASTNode* var_access =
             ast_create_node(AST_VAR_ACCESS, current_token.line);
-        var_access->name = strdup(decl->name);
-        assign->left = var_access;
-        assign->right = parse_expr();
+        var_access->as.var.name = strdup(decl->as.decl.name);
+        assign->as.binary.left = var_access;
+        assign->as.binary.right = parse_expr();
         ast_add_child(
             decl, assign
         );  // Store assignment in child of var decl for now
@@ -334,21 +329,21 @@ static ASTNode* parse_statement() {
     ASTNode* node = ast_create_node(AST_IF, current_token.line);
     advance_token();
     match(TOK_LPAREN);
-    node->cond = parse_expr();
+    node->as.if_stmt.cond = parse_expr();
     match(TOK_RPAREN);
-    node->then_branch = parse_statement();
+    node->as.if_stmt.then_branch = parse_statement();
     if (check(TOK_ELSE)) {
       advance_token();
-      node->else_branch = parse_statement();
+      node->as.if_stmt.else_branch = parse_statement();
     }
     return node;
   } else if (check(TOK_WHILE)) {
     ASTNode* node = ast_create_node(AST_WHILE, current_token.line);
     advance_token();
     match(TOK_LPAREN);
-    node->cond = parse_expr();
+    node->as.loop.cond = parse_expr();
     match(TOK_RPAREN);
-    node->body = parse_statement();
+    node->as.loop.body = parse_statement();
     return node;
   } else if (check(TOK_FOR)) {
     ASTNode* node = ast_create_node(AST_FOR, current_token.line);
@@ -359,41 +354,41 @@ static ASTNode* parse_statement() {
     if (init_type) {
       // For loop init is a declaration
       ASTNode* decl = ast_create_node(AST_VAR_DECL, current_token.line);
-      decl->var_type = init_type;
-      decl->name = strdup(current_token.text);
+      decl->as.decl.var_type = init_type;
+      decl->as.decl.name = strdup(current_token.text);
       match(TOK_IDENTIFIER);
       if (check(TOK_ASSIGN)) {
         advance_token();
         ASTNode* assign = ast_create_node(AST_ASSIGN, current_token.line);
         ASTNode* var_access =
             ast_create_node(AST_VAR_ACCESS, current_token.line);
-        var_access->name = strdup(decl->name);
-        assign->left = var_access;
-        assign->right = parse_expr();
+        var_access->as.var.name = strdup(decl->as.decl.name);
+        assign->as.binary.left = var_access;
+        assign->as.binary.right = parse_expr();
         ast_add_child(decl, assign);
       }
-      node->init = decl;
+      node->as.loop.init = decl;
       match(TOK_SEMICOLON);
     } else if (!check(TOK_SEMICOLON)) {
-      node->init = parse_expr();
+      node->as.loop.init = parse_expr();
       match(TOK_SEMICOLON);
     } else {
       match(TOK_SEMICOLON);
     }
 
-    if (!check(TOK_SEMICOLON)) node->cond = parse_expr();
+    if (!check(TOK_SEMICOLON)) node->as.loop.cond = parse_expr();
     match(TOK_SEMICOLON);
 
-    if (!check(TOK_RPAREN)) node->inc = parse_expr();
+    if (!check(TOK_RPAREN)) node->as.loop.inc = parse_expr();
     match(TOK_RPAREN);
 
-    node->body = parse_statement();
+    node->as.loop.body = parse_statement();
     return node;
   } else if (check(TOK_RETURN)) {
     ASTNode* node = ast_create_node(AST_RETURN, current_token.line);
     advance_token();
     if (!check(TOK_SEMICOLON)) {
-      node->expr = parse_expr();
+      node->as.single_expr.expr = parse_expr();
     }
     match(TOK_SEMICOLON);
     return node;
@@ -404,7 +399,7 @@ static ASTNode* parse_statement() {
     return ast_create_node(AST_BLOCK, current_token.line);  // Empty statement
   } else {
     ASTNode* node = ast_create_node(AST_EXPR_STMT, current_token.line);
-    node->expr = parse_expr();
+    node->as.single_expr.expr = parse_expr();
     match(TOK_SEMICOLON);
     return node;
   }
@@ -416,7 +411,7 @@ static ASTNode* parse_declaration() {
     if (check(TOK_LBRACE)) {
       // Struct declaration
       ASTNode* node = ast_create_node(AST_STRUCT_DECL, current_token.line);
-      node->name = strdup(t->struct_name);
+      node->as.decl.name = strdup(t->struct_name);
       ast_free_type(t);
       match(TOK_LBRACE);
       while (!check(TOK_RBRACE) && !check(TOK_EOF)) {
@@ -426,9 +421,9 @@ static ASTNode* parse_declaration() {
           exit(1);
         }
         ASTNode* mem = ast_create_node(AST_VAR_DECL, current_token.line);
-        mem->var_type = mem_type;
+        mem->as.decl.var_type = mem_type;
         if (check(TOK_IDENTIFIER)) {
-          mem->name = strdup(current_token.text);
+          mem->as.decl.name = strdup(current_token.text);
           advance_token();
         } else {
           fprintf(stderr, "Error: expected identifier in struct member\n");
@@ -438,12 +433,12 @@ static ASTNode* parse_declaration() {
         if (check(TOK_LBRACKET)) {
           advance_token();
           if (check(TOK_NUMBER)) {
-            mem->array_size = strtol(current_token.text, NULL, 0);
+            mem->as.decl.array_size = strtol(current_token.text, NULL, 0);
             advance_token();
           }
           match(TOK_RBRACKET);
         } else {
-          mem->array_size = 1;
+          mem->as.decl.array_size = 1;
         }
 
         match(TOK_SEMICOLON);
@@ -473,8 +468,8 @@ static ASTNode* parse_declaration() {
     if (check(TOK_LPAREN)) {
       // Function declaration
       ASTNode* node = ast_create_node(AST_FUNC_DECL, current_token.line);
-      node->var_type = type;
-      node->name = name;
+      node->as.decl.var_type = type;
+      node->as.decl.name = name;
       match(TOK_LPAREN);
 
       // params
@@ -486,9 +481,9 @@ static ASTNode* parse_declaration() {
         while (!check(TOK_RPAREN) && !check(TOK_EOF)) {
           TypeInfo* ptype = parse_type();
           ASTNode* pdecl = ast_create_node(AST_VAR_DECL, current_token.line);
-          pdecl->var_type = ptype;
+          pdecl->as.decl.var_type = ptype;
           if (check(TOK_IDENTIFIER)) {
-            pdecl->name = strdup(current_token.text);
+            pdecl->as.decl.name = strdup(current_token.text);
             advance_token();
           } else {
             fprintf(stderr, "Error: expected parameter name\n");
@@ -499,13 +494,13 @@ static ASTNode* parse_declaration() {
         }
       }
       match(TOK_RPAREN);
-      node->body = parse_block();
+      node->as.decl.body = parse_block();
       return node;
     } else {
       // Global Var
       ASTNode* node = ast_create_node(AST_VAR_DECL, current_token.line);
-      node->var_type = type;
-      node->name = name;
+      node->as.decl.var_type = type;
+      node->as.decl.name = name;
       match(TOK_SEMICOLON);
       return node;
     }

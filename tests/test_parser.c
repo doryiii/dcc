@@ -41,7 +41,8 @@ int test_parser_led_blink() {
     return 1;
   }
 
-  if (ast->num_children < 2) {
+  ASTNode* struct_decl = ast->first_child;
+  if (!struct_decl || !struct_decl->next_sibling) {
     fprintf(
         stderr,
         "FAIL: Expected at least 2 top-level declarations (struct and main)\n"
@@ -50,17 +51,16 @@ int test_parser_led_blink() {
   }
 
   // Validate Struct
-  ASTNode* struct_decl = ast->children[0];
   if (struct_decl->type != AST_STRUCT_DECL ||
-      strcmp(struct_decl->name, "PORT_struct") != 0) {
+      strcmp(struct_decl->as.decl.name, "PORT_struct") != 0) {
     fprintf(stderr, "FAIL: Expected struct PORT_struct declaration\n");
     return 1;
   }
 
   // Validate main
-  ASTNode* main_decl = ast->children[1];
+  ASTNode* main_decl = struct_decl->next_sibling;
   if (main_decl->type != AST_FUNC_DECL ||
-      strcmp(main_decl->name, "main") != 0) {
+      strcmp(main_decl->as.decl.name, "main") != 0) {
     fprintf(stderr, "FAIL: Expected main function declaration\n");
     return 1;
   }

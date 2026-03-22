@@ -12,16 +12,15 @@ ASTNode* ast_create_node(ASTNodeType type, int line) {
 }
 
 void ast_add_child(ASTNode* parent, ASTNode* child) {
-  if (parent->capacity == 0) {
-    parent->capacity = 4;
-    parent->children = (ASTNode**)malloc(sizeof(ASTNode*) * parent->capacity);
-  } else if (parent->num_children == parent->capacity) {
-    parent->capacity *= 2;
-    parent->children = (ASTNode**)realloc(
-        parent->children, sizeof(ASTNode*) * parent->capacity
-    );
+  if (!parent->first_child) {
+    parent->first_child = child;
+  } else {
+    ASTNode* current = parent->first_child;
+    while (current->next_sibling) {
+      current = current->next_sibling;
+    }
+    current->next_sibling = child;
   }
-  parent->children[parent->num_children++] = child;
 }
 
 TypeInfo* ast_create_type(BaseType base) {
@@ -40,24 +39,67 @@ void ast_free_type(TypeInfo* type) {
 void ast_free_node(ASTNode* node) {
   if (!node) return;
 
-  if (node->name) free(node->name);
-  if (node->member_name) free(node->member_name);
-  if (node->var_type) ast_free_type(node->var_type);
-
-  for (int i = 0; i < node->num_children; i++) {
-    ast_free_node(node->children[i]);
+  // Free children (intrusive linked list)
+  ASTNode* child = node->first_child;
+  while (child) {
+    ASTNode* next = child->next_sibling;
+    ast_free_node(child);
+    child = next;
   }
-  if (node->children) free(node->children);
 
-  if (node->body) ast_free_node(node->body);
-  if (node->cond) ast_free_node(node->cond);
-  if (node->then_branch) ast_free_node(node->then_branch);
-  if (node->else_branch) ast_free_node(node->else_branch);
-  if (node->init) ast_free_node(node->init);
-  if (node->inc) ast_free_node(node->inc);
-  if (node->expr) ast_free_node(node->expr);
-  if (node->left) ast_free_node(node->left);
-  if (node->right) ast_free_node(node->right);
+  // Free node specific data
+  switch (node->type) {
+    case AST_VAR_DECL:
+    case AST_FUNC_DECL:
+    case AST_STRUCT_DECL:
+      if (node->as.decl.name) free(node->as.decl.name);
+      if (node->as.decl.var_type) ast_free_type(node->as.decl.var_type);
+      if (node->as.decl.body) ast_free_node(node->as.decl.body);
+      break;
+
+    case AST_IF:
+      if (node->as.if_stmt.cond) ast_free_node(node->as.if_stmt.cond);
+      if (node->as.if_stmt.then_branch) ast_free_node(node->as.if_stmt.then_branch);
+      if (node->as.if_stmt.else_branch) ast_free_node(node->as.if_stmt.else_branch);
+      break;
+
+    case AST_WHILE:
+    case AST_FOR:
+      if (node->as.loop.init) ast_free_node(node->as.loop.init);
+      if (node->as.loop.cond) ast_free_node(node->as.loop.cond);
+      if (node->as.loop.inc) ast_free_node(node->as.loop.inc);
+      if (node->as.loop.body) ast_free_node(node->as.loop.body);
+      break;
+
+    case AST_RETURN:
+    case AST_EXPR_STMT:
+    case AST_UNARY_OP:
+    case AST_CAST:
+      if (node->as.single_expr.expr) ast_free_node(node->as.single_expr.expr);
+      if (node->as.single_expr.var_type) ast_free_type(node->as.single_expr.var_type);
+      break;
+
+    case AST_ASSIGN:
+    case AST_BINARY_OP:
+      if (node->as.binary.left) ast_free_node(node->as.binary.left);
+      if (node->as.binary.right) ast_free_node(node->as.binary.right);
+      break;
+
+    case AST_MEMBER_ACCESS:
+      if (node->as.member.expr) ast_free_node(node->as.member.expr);
+      if (node->as.member.member_name) free(node->as.member.member_name);
+      break;
+
+    case AST_VAR_ACCESS:
+      if (node->as.var.name) free(node->as.var.name);
+      break;
+
+    case AST_PROGRAM:
+    case AST_BLOCK:
+    case AST_NUMBER:
+      // Handled by generic children or no dynamic memory
+      break;
+  }
 
   free(node);
 }
@@ -90,13 +132,13 @@ void ast_print(ASTNode* node, int indent) {
       printf("Program\n");
       break;
     case AST_VAR_DECL:
-      printf("VarDecl: %s %s\n", type_to_string(node->var_type), node->name);
+      printf("VarDecl: %s %s\n", type_to_string(node->as.decl.var_type), node->as.decl.name);
       break;
     case AST_STRUCT_DECL:
-      printf("StructDecl: %s\n", node->name);
+      printf("StructDecl: %s\n", node->as.decl.name);
       break;
     case AST_FUNC_DECL:
-      printf("FuncDecl: %s %s\n", type_to_string(node->var_type), node->name);
+      printf("FuncDecl: %s %s\n", type_to_string(node->as.decl.var_type), node->as.decl.name);
       break;
     case AST_BLOCK:
       printf("Block\n");
@@ -120,72 +162,90 @@ void ast_print(ASTNode* node, int indent) {
       printf("Assign\n");
       break;
     case AST_BINARY_OP:
-      printf("BinaryOp: %d\n", node->op);
+      printf("BinaryOp: %d\n", node->as.binary.op);
       break;
     case AST_UNARY_OP:
-      printf("UnaryOp: %d\n", node->op);
+      printf("UnaryOp: %d\n", node->as.single_expr.op);
       break;
     case AST_MEMBER_ACCESS:
-      printf("MemberAccess: .%s\n", node->member_name);
+      printf("MemberAccess: .%s\n", node->as.member.member_name);
       break;
     case AST_VAR_ACCESS:
-      printf("VarAccess: %s\n", node->name);
+      printf("VarAccess: %s\n", node->as.var.name);
       break;
     case AST_NUMBER:
-      printf("Number: %d\n", node->int_val);
+      printf("Number: %d\n", node->as.number.int_val);
       break;
     case AST_CAST:
-      printf("Cast: %s\n", type_to_string(node->var_type));
+      printf("Cast: %s\n", type_to_string(node->as.single_expr.var_type));
       break;
   }
 
-  for (int i = 0; i < node->num_children; i++) {
-    ast_print(node->children[i], indent + 1);
+  ASTNode* child = node->first_child;
+  while (child) {
+    ast_print(child, indent + 1);
+    child = child->next_sibling;
   }
 
-  if (node->cond) {
-    for (int i = 0; i < indent + 1; i++) {
-      printf("  ");
+  if (node->type == AST_IF) {
+    if (node->as.if_stmt.cond) {
+      for (int i = 0; i < indent + 1; i++) printf("  ");
+      printf("Cond:\n");
+      ast_print(node->as.if_stmt.cond, indent + 2);
     }
-    printf("Cond:\n");
-    ast_print(node->cond, indent + 2);
+    if (node->as.if_stmt.then_branch) {
+      for (int i = 0; i < indent + 1; i++) printf("  ");
+      printf("Then:\n");
+      ast_print(node->as.if_stmt.then_branch, indent + 2);
+    }
+    if (node->as.if_stmt.else_branch) {
+      for (int i = 0; i < indent + 1; i++) printf("  ");
+      printf("Else:\n");
+      ast_print(node->as.if_stmt.else_branch, indent + 2);
+    }
   }
-  if (node->then_branch) {
-    for (int i = 0; i < indent + 1; i++) {
-      printf("  ");
+
+  if (node->type == AST_WHILE || node->type == AST_FOR) {
+    if (node->as.loop.init) {
+      for (int i = 0; i < indent + 1; i++) printf("  ");
+      printf("Init:\n");
+      ast_print(node->as.loop.init, indent + 2);
     }
-    printf("Then:\n");
-    ast_print(node->then_branch, indent + 2);
+    if (node->as.loop.cond) {
+      for (int i = 0; i < indent + 1; i++) printf("  ");
+      printf("Cond:\n");
+      ast_print(node->as.loop.cond, indent + 2);
+    }
+    if (node->as.loop.inc) {
+      for (int i = 0; i < indent + 1; i++) printf("  ");
+      printf("Inc:\n");
+      ast_print(node->as.loop.inc, indent + 2);
+    }
+    if (node->as.loop.body) {
+      for (int i = 0; i < indent + 1; i++) printf("  ");
+      printf("Body:\n");
+      ast_print(node->as.loop.body, indent + 2);
+    }
   }
-  if (node->else_branch) {
-    for (int i = 0; i < indent + 1; i++) {
-      printf("  ");
-    }
-    printf("Else:\n");
-    ast_print(node->else_branch, indent + 2);
+
+  if (node->type == AST_RETURN || node->type == AST_EXPR_STMT || node->type == AST_UNARY_OP || node->type == AST_CAST) {
+    if (node->as.single_expr.expr) ast_print(node->as.single_expr.expr, indent + 1);
   }
-  if (node->init) {
-    for (int i = 0; i < indent + 1; i++) {
-      printf("  ");
-    }
-    printf("Init:\n");
-    ast_print(node->init, indent + 2);
+
+  if (node->type == AST_ASSIGN || node->type == AST_BINARY_OP) {
+    if (node->as.binary.left) ast_print(node->as.binary.left, indent + 1);
+    if (node->as.binary.right) ast_print(node->as.binary.right, indent + 1);
   }
-  if (node->inc) {
-    for (int i = 0; i < indent + 1; i++) {
-      printf("  ");
-    }
-    printf("Inc:\n");
-    ast_print(node->inc, indent + 2);
+
+  if (node->type == AST_MEMBER_ACCESS) {
+    if (node->as.member.expr) ast_print(node->as.member.expr, indent + 1);
   }
-  if (node->expr) ast_print(node->expr, indent + 1);
-  if (node->left) ast_print(node->left, indent + 1);
-  if (node->right) ast_print(node->right, indent + 1);
-  if (node->body) {
-    for (int i = 0; i < indent + 1; i++) {
-      printf("  ");
+
+  if (node->type == AST_FUNC_DECL) {
+    if (node->as.decl.body) {
+      for (int i = 0; i < indent + 1; i++) printf("  ");
+      printf("Body:\n");
+      ast_print(node->as.decl.body, indent + 2);
     }
-    printf("Body:\n");
-    ast_print(node->body, indent + 2);
   }
 }
