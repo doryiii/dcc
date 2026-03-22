@@ -177,15 +177,16 @@ int main(void) {
   if (offset > 0) {
     write_page(avr_pc - offset, current_page_buf);
   }
+  printf_P(PSTR("Free RAM after codegen: %u bytes\r\n"), get_free_ram());
 
-  printf_P(PSTR("Program size: %u\r\n"), (uint16_t)(avr_pc - APP_START));
   printf_P(PSTR("Code generation done. Applying fixups...\r\n"));
   dasm_apply_fixups(dasm_read_page_cb, dasm_write_page_cb);
   printf_P(PSTR("Free RAM after fixup: %u bytes\r\n"), get_free_ram());
 
   ast_free_node(ast);
 
-  printf_P(PSTR("Done! Jumping to app...\r\n"));
+  printf_P(PSTR("Done! Program size: %u\r\n"), (uint16_t)(avr_pc - APP_START));
+  printf_P(PSTR("Jumping to app...\r\n"));
   usart_tx_flush(2);
   _delay_ms(1000);
 

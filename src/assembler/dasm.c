@@ -28,16 +28,16 @@ typedef struct {
 } AsmToken;
 
 typedef struct Symbol {
-  char name[32];
-  uint32_t address;
   struct Symbol* next;
+  uint32_t address;
+  char name[];
 } Symbol;
 
 typedef struct Fixup {
-  char name[32];
+  struct Fixup* next;
   uint32_t patch_address;
   uint8_t type;
-  struct Fixup* next;
+  char name[];
 } Fixup;
 
 static Symbol* symbols = NULL;
@@ -45,18 +45,16 @@ static Fixup* fixups = NULL;
 static uint32_t dasm_pc = 0;
 
 static void add_symbol(const char* name, uint32_t address) {
-  Symbol* s = (Symbol*)malloc(sizeof(Symbol));
-  strncpy(s->name, name, 31);
-  s->name[31] = '\0';
+  Symbol* s = (Symbol*)malloc(sizeof(Symbol) + strlen(name) + 1);
+  strcpy(s->name, name);
   s->address = address;
   s->next = symbols;
   symbols = s;
 }
 
 static void add_fixup(const char* name, uint32_t patch_address, uint8_t type) {
-  Fixup* f = (Fixup*)malloc(sizeof(Fixup));
-  strncpy(f->name, name, 31);
-  f->name[31] = '\0';
+  Fixup* f = (Fixup*)malloc(sizeof(Fixup) + strlen(name) + 1);
+  strcpy(f->name, name);
   f->patch_address = patch_address;
   f->type = type;
   f->next = fixups;
