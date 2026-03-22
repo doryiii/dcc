@@ -38,7 +38,7 @@ load: dcc.hex
 	avrdude -p avr128db28 -c snap_updi -P usb -B 5 -Uflash:w:$^
 
 dcc.hex: dcc.elf
-	avr-objcopy -j .text -j .data -j .rodata -O ihex $^ $@
+	avr-objcopy -j .text -j .data -j .rodata -j .bss -O ihex $^ $@
 	avr-size $^
 
 dcc.elf: src/avr/avr_main.c src/avr/clkctrl.c src/avr/usart.c $(COMPILER_SRC) $(ASSEMBLER_SRC)

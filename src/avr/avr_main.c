@@ -4,6 +4,7 @@
 #include <avr/pgmspace.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <util/delay.h>
@@ -101,11 +102,28 @@ int avr_getchar(void) {
   return c;
 }
 
+extern void *__brkval;
+
+static uint16_t get_free_ram(void) {
+  uint16_t free_memory;
+  if ((uint16_t)__brkval == 0) {
+    // if malloc hasn't been called, heap starts after bss
+    extern int __bss_end;
+    free_memory = ((uint16_t)&free_memory) - ((uint16_t)&__bss_end);
+  } else {
+    // heap has been used, calculate diff between stack pointer and top of heap
+    free_memory = ((uint16_t)&free_memory) - ((uint16_t)__brkval);
+  }
+  return free_memory;
+}
+
 static uint32_t avr_pc = APP_START;
 static uint8_t current_page_buf[PROGMEM_PAGE_SIZE];
 
 static void avr_emit_cb(const char* line) {
+#ifdef DEBUG_PRINT_ASM
   printf_P(PSTR("%s\r"), line);
+#endif
   uint32_t inst;
   int len = dasm_emit(line, &inst);
   if (len > 0) {
@@ -144,9 +162,11 @@ int main(void) {
   memset(current_page_buf, 0xFF, PROGMEM_PAGE_SIZE);
   avr_pc = APP_START;
 
+  printf_P(PSTR("Free RAM before parsing: %u bytes\r\n"), get_free_ram());
   dasm_init();
   preprocessor_init(avr_getchar);
   ASTNode* ast = parse_program(preprocessor_getchar);
+  printf_P(PSTR("Free RAM after parsing: %u bytes\r\n"), get_free_ram());
 
   printf_P(PSTR("Parsing done. Generating code...\r\n"));
   codegen_set_emit_cb(avr_emit_cb);
@@ -161,6 +181,7 @@ int main(void) {
   printf_P(PSTR("Program size: %u\r\n"), (uint16_t)(avr_pc - APP_START));
   printf_P(PSTR("Code generation done. Applying fixups...\r\n"));
   dasm_apply_fixups(dasm_read_page_cb, dasm_write_page_cb);
+  printf_P(PSTR("Free RAM after fixup: %u bytes\r\n"), get_free_ram());
 
   ast_free_node(ast);
 
