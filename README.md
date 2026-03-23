@@ -1,10 +1,10 @@
 *Don't want to install a toolchain onto your computer to work with AVR chips?
 Well I have just the thing for you!*
 
-**D**ory's **C** **C**ompiler is a small, streaming C compiler and assembler
-designed to run natively on the **AVR128DB28** microcontroller. It operates as
-a bootloader, receiving C source code over UART and compiling it directly into
-the application flash area.
+**D**ory's **C** **C**ompiler is a small (30KB), streaming C compiler and
+assembler designed to run natively on the **AVR128DB28** microcontroller.
+It operates as a bootloader, receiving C source code over UART and compiling
+it directly into the application flash area.
 
 - Runs both on host PC and natively on the AVR hardware.
 - When running on the avr128db28, it acts as a bootloader that compiles C source
@@ -18,14 +18,16 @@ the application flash area.
 ## Hardware Configuration (AVR128DB28)
 
 - **BOOTSIZE** fuse needs to be set to `0xC0` (96KB reserved for the bootloader,
-  with 32KB for application code).
+  with 32KB for application code). This is currently hardcoded but can be
+  changed relatively easy, although it's unlikely a program larger than 32KB
+  can be compiled on the chip's 16KB RAM.
 - **Clock** is hardcoded to 24MHz internal oscillator.
 - **Communication** is hardcoded to USART2 @ 9600 Baud (pins PF0 and PF1).
 
 The compiler supports a very small subset of C:
 - Types: `int`, `void`, `uint8_t`, `uint16_t`.
 - Memory-mapped IO via `struct` pointers and member access (`.`).
-- Control Flow: `if/else`, `while`, `for`, `return`.
+- Control Flow: `if/else`, `while`, `for`, function calls, `return`.
 - Operators:
     - Arithmetic: `+`, `-`, `*`,
     - Logical/Bitwise: `&&`, `||`, `!`, `&`, `|`, `^`, `<<`, `>>`.
@@ -35,12 +37,11 @@ The compiler supports a very small subset of C:
 - Preprocessor: Simple `#define` macros (without arguments).
 
 Notable limitations:
+- Integer division and any kind of floating point math
 - x++ behaves exactly the same as ++x (they both return the new value)
-- Integer division and any kind of floating point math.
 - The compiler currently keeps the AST in internal SRAM, with each node taking
-  up 50-70 bytes, practically limiting the amount of nodes to 150-250 nodes
-  given the avr128db28's 16KB SRAM. Future expansion may include external SRAM
-  support
+  up 14 bytes, practically limiting the amount of nodes to ~1000 nodes given
+  the avr128db28's 16KB SRAM. Future expansion may include external SRAM support
 - The compiler is not self-hosting and likely never will be: no AVR code can
   modify the code area it is currently executing from, and the boot section can
   only be modified by an external programmer
@@ -49,7 +50,7 @@ Notable limitations:
 
 ### For PC
 
-`make && ./dcc blink.c | ./dasm -h blink.hex`
+`make && ./dcc samples/blink.c | ./dasm -h blink.hex`
 
 The output hex or bin file can then be flashed with avrdude.
 
