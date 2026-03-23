@@ -19,8 +19,7 @@ it directly into the application flash area.
 
 - **BOOTSIZE** fuse needs to be set to `0xC0` (96KB reserved for the bootloader,
   with 32KB for application code). This is currently hardcoded but can be
-  changed relatively easy, although it's unlikely a program larger than 32KB
-  can be compiled on the chip's 16KB RAM.
+  changed relatively easy to accomodate larger programs (but why?).
 - **Clock** is hardcoded to 24MHz internal oscillator.
 - **Communication** is hardcoded to USART2 @ 9600 Baud (pins PF0 and PF1).
 
@@ -37,14 +36,16 @@ The compiler supports a very small subset of C:
 - Preprocessor: Simple `#define` macros (without arguments).
 
 Notable limitations:
-- Integer division and any kind of floating point math
-- x++ behaves exactly the same as ++x (they both return the new value)
-- The compiler currently keeps the AST in internal SRAM, with each node taking
-  up 14 bytes, practically limiting the amount of nodes to ~1000 nodes given
-  the avr128db28's 16KB SRAM. Future expansion may include external SRAM support
+- Integer division and any kind of floating point math.
+- x++ behaves exactly the same as ++x (they both return the new value).
+- The compiler currently keeps the AST of each top-level (structs, functions,
+  global variables) in internal SRAM, with each node taking up 14 bytes,
+  practically limiting the amount of nodes for the largest function to ~900
+  nodes after drivers overhead and identifier names list, given the
+  avr128db28's 16KB SRAM. Future expansion may include external SRAM support.
 - The compiler is not self-hosting and likely never will be: no AVR code can
   modify the code area it is currently executing from, and the boot section can
-  only be modified by an external programmer
+  only be modified by an external programmer.
 
 ## Usage
 

@@ -6,13 +6,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <util/atomic.h>
 
 #include "gpio.h"
 
-static volatile uint8_t usart_rx_buf[3][USART_BUFSIZE];
+static volatile uint8_t* usart_rx_buf[3] = {NULL, NULL, NULL};
 static volatile uint8_t usart_rx_bufindex[3], usart_rx_buflen[3];
-static volatile uint8_t usart_tx_buf[3][USART_BUFSIZE];
+static volatile uint8_t* usart_tx_buf[3] = {NULL, NULL, NULL};
 static volatile uint8_t usart_tx_bufindex[3], usart_tx_buflen[3];
 volatile USART_t* dev[3] = {
     (USART_t*)0x0800,
@@ -40,6 +41,10 @@ void usart_console_init(uint8_t n, uint32_t baud) {
 }
 
 void usart_init(uint8_t n, uint32_t baud) {
+  if (n < 3) {
+    if (!usart_rx_buf[n]) usart_rx_buf[n] = (uint8_t*)malloc(USART_BUFSIZE);
+    if (!usart_tx_buf[n]) usart_tx_buf[n] = (uint8_t*)malloc(USART_BUFSIZE);
+  }
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     switch (n) {
       case 0:
@@ -66,6 +71,7 @@ void usart_init(uint8_t n, uint32_t baud) {
 }
 
 void usart_putc(uint8_t n, char c) {
+  if (n >= 3 || !usart_tx_buf[n]) return;
   while (usart_tx_buflen[n] >= USART_BUFSIZE);
   // the only other thing modifying buflen only decreases it.
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
@@ -76,16 +82,19 @@ void usart_putc(uint8_t n, char c) {
   }
 }
 
-uint8_t usart_available(uint8_t n) { return usart_rx_buflen[n]; }
+uint8_t usart_available(uint8_t n) {
+  return (n < 3 && usart_rx_buf[n]) ? usart_rx_buflen[n] : 0;
+}
 
 void usart_tx_flush(uint8_t n) {
+  if (n >= 3 || !usart_tx_buf[n]) return;
   while (usart_tx_buflen[n]);
   while (dev[n]->CTRLA & USART_DREIE_bm);
   while (!(dev[n]->STATUS & USART_TXCIF_bm));
 }
 
 uint8_t usart_getc(uint8_t n) {
-  if (usart_rx_buflen[n] == 0) return 0;
+  if (n >= 3 || !usart_rx_buf[n] || usart_rx_buflen[n] == 0) return 0;
   uint8_t c;
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     c = usart_rx_buf[n][usart_rx_bufindex[n]++];
@@ -114,6 +123,7 @@ void usart_write_P(uint8_t n, const char* c, uint32_t len) {
 
 // Write 1 byte from buffer if buffer not empty
 static inline void write_ready_isr(uint8_t n) {
+  if (!usart_tx_buf[n]) return;
   if (usart_tx_buflen[n] > 0) {
     dev[n]->TXDATAL = usart_tx_buf[n][usart_tx_bufindex[n]++];
     usart_tx_bufindex[n] %= USART_BUFSIZE;
@@ -130,6 +140,7 @@ ISR(USART2_DRE_vect, ISR_BLOCK) { write_ready_isr(2); }
 // Read 1 byte to buffer whenever a byte arrives. If buffer full, drop byte.
 static inline void read_avail_isr(uint8_t n) {
   uint8_t c = dev[n]->RXDATAL;
+  if (!usart_rx_buf[n]) return;
   if (usart_rx_buflen[n] < USART_BUFSIZE) {
     uint8_t i = (usart_rx_bufindex[n] + usart_rx_buflen[n]++) % USART_BUFSIZE;
     usart_rx_buf[n][i] = c;

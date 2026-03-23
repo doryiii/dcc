@@ -58,7 +58,7 @@ static void visit_struct_decl(ASTNode* node) {
     Member* m = (Member*)calloc(1, sizeof(Member));
     m->name = intern_string(mem_node->as.decl.name);
     m->offset = offset;
-    m->type = mem_node->as.decl.var_type;
+    m->type = ast_clone_type(mem_node->as.decl.var_type);
 
     int element_size = 1;
     if (m->type && (m->type->base == TYPE_UINT16 || m->type->base == TYPE_INT ||
@@ -127,24 +127,6 @@ static int next_label() { return state.label_count++; }
 static void visit(ASTNode* node);
 
 static void visit_program(ASTNode* node) {
-  EMIT("; Setup Stack Pointer\n");
-  EMIT("    ldi r28, 0xFF\n");
-  EMIT("    ldi r29, 0x7F\n");
-  EMIT("    out 0x3D, r28 ; SPL\n");
-  EMIT("    out 0x3E, r29 ; SPH\n\n");
-  int l_get_pc = next_label();
-  EMIT("    rcall L_get_pc_%d\n", l_get_pc);
-  EMIT("L_get_pc_%d:\n", l_get_pc);
-  EMIT("    pop r31\n");
-  EMIT("    pop r30\n");
-  EMIT("    ldi r26, lo8(pm(main - L_get_pc_%d))\n", l_get_pc);
-  EMIT("    ldi r27, hi8(pm(main - L_get_pc_%d))\n", l_get_pc);
-  EMIT("    add r30, r26\n");
-  EMIT("    adc r31, r27\n");
-  EMIT("    icall\n");
-  EMIT("L_inf_loop:\n");
-  EMIT("    rjmp L_inf_loop\n\n");
-
   ASTNode* child = node->first_child;
   while (child) {
     visit(child);
@@ -772,8 +754,40 @@ static void visit(ASTNode* node) {
   }
 }
 
-void codegen(ASTNode* node) {
+void codegen_prologue(void) {
   state.label_count = 0;
   state.symbols = NULL;
-  visit(node);
+
+  EMIT("; Setup Stack Pointer\n");
+  EMIT("    ldi r28, 0xFF\n");
+  EMIT("    ldi r29, 0x7F\n");
+  EMIT("    out 0x3D, r28 ; SPL\n");
+  EMIT("    out 0x3E, r29 ; SPH\n\n");
+  int l_get_pc = next_label();
+  EMIT("    rcall L_get_pc_%d\n", l_get_pc);
+  EMIT("L_get_pc_%d:\n", l_get_pc);
+  EMIT("    pop r31\n");
+  EMIT("    pop r30\n");
+  EMIT("    ldi r26, lo8(pm(main - L_get_pc_%d))\n", l_get_pc);
+  EMIT("    ldi r27, hi8(pm(main - L_get_pc_%d))\n", l_get_pc);
+  EMIT("    add r30, r26\n");
+  EMIT("    adc r31, r27\n");
+  EMIT("    icall\n");
+  EMIT("L_inf_loop:\n");
+  EMIT("    rjmp L_inf_loop\n\n");
+}
+
+void codegen_top_level(ASTNode* node) { visit(node); }
+
+void codegen(ASTNode* node) {
+  codegen_prologue();
+  if (node && node->type == AST_PROGRAM) {
+    ASTNode* child = node->first_child;
+    while (child) {
+      visit(child);
+      child = child->next_sibling;
+    }
+  } else {
+    visit(node);
+  }
 }

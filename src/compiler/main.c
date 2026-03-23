@@ -27,9 +27,7 @@ int main(int argc, char** argv) {
   }
 
   preprocessor_init(file_getchar);
-  ASTNode* ast = parse_program(preprocessor_getchar);
-
-  fclose(in_file);
+  parser_init(preprocessor_getchar);
 
   out_file = stdout;
   if (argc >= 4 && strcmp(argv[2], "-o") == 0) {
@@ -41,10 +39,17 @@ int main(int argc, char** argv) {
   }
 
   codegen_set_emit_cb(file_emit_cb);
-  codegen(ast);
+  codegen_prologue();
 
+  ASTNode* decl;
+  while ((decl = parse_top_level_declaration()) != NULL) {
+    codegen_top_level(decl);
+    ast_free_node(decl);
+  }
+
+  fclose(in_file);
   if (out_file != stdout) fclose(out_file);
-  ast_free_node(ast);
+  ast_free_string_pool();
 
   return 0;
 }

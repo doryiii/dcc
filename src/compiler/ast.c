@@ -59,6 +59,14 @@ TypeInfo* ast_create_type(BaseType base) {
   return t;
 }
 
+TypeInfo* ast_clone_type(TypeInfo* type) {
+  if (!type) return NULL;
+  TypeInfo* clone = ast_create_type(type->base);
+  clone->struct_name = type->struct_name;
+  clone->ptr_to = ast_clone_type(type->ptr_to);
+  return clone;
+}
+
 void ast_free_type(TypeInfo* type) {
   if (!type) return;
   if (type->ptr_to) ast_free_type(type->ptr_to);

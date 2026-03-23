@@ -162,28 +162,36 @@ int main(void) {
   memset(current_page_buf, 0xFF, PROGMEM_PAGE_SIZE);
   avr_pc = APP_START;
 
-  printf_P(PSTR("Free RAM before parsing: %u bytes\r\n"), get_free_ram());
+  printf_P(PSTR("Free RAM: %u\r\n"), get_free_ram());
   dasm_init();
   preprocessor_init(avr_getchar);
-  ASTNode* ast = parse_program(preprocessor_getchar);
-  printf_P(PSTR("Free RAM after parsing: %u bytes\r\n"), get_free_ram());
-
-  printf_P(PSTR("Parsing done. Generating code...\r\n"));
+  parser_init(preprocessor_getchar);
   codegen_set_emit_cb(avr_emit_cb);
-  codegen(ast);
+  codegen_prologue();
+
+  ASTNode* decl;
+  uint16_t ram_low_watermark = get_free_ram();
+  printf_P(PSTR("Prologue RAM low watermark: %u\r\n"), ram_low_watermark);
+  while ((decl = parse_top_level_declaration()) != NULL) {
+    codegen_top_level(decl);
+    uint16_t free_ram = get_free_ram();
+    if (free_ram < ram_low_watermark) {
+      ram_low_watermark = free_ram;
+    }
+    ast_free_node(decl);
+  }
 
   // Flush any remaining partial page
   uint32_t offset = (avr_pc - APP_START) % PROGMEM_PAGE_SIZE;
   if (offset > 0) {
     write_page(avr_pc - offset, current_page_buf);
   }
-  printf_P(PSTR("Free RAM after codegen: %u bytes\r\n"), get_free_ram());
+  printf_P(PSTR("Codegen RAM low watermark: %u\r\n"), get_free_ram());
 
   printf_P(PSTR("Code generation done. Applying fixups...\r\n"));
   dasm_apply_fixups(dasm_read_page_cb, dasm_write_page_cb);
-  printf_P(PSTR("Free RAM after fixup: %u bytes\r\n"), get_free_ram());
+  printf_P(PSTR("Final RAM low watermark: %u\r\n"), get_free_ram());
 
-  ast_free_node(ast);
   ast_free_string_pool();
 
   printf_P(PSTR("Done! Program size: %u\r\n"), (uint16_t)(avr_pc - APP_START));

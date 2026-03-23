@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define USART_BUFSIZE 16
+#define USART_BUFSIZE 128
 
 void usart_console_init(uint8_t n, uint32_t baud);
 void usart_init(uint8_t n, uint32_t baud);

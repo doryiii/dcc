@@ -112,6 +112,7 @@ typedef struct ASTNode {
 ASTNode* ast_create_node(ASTNodeType type, int line);
 void ast_add_child(ASTNode* parent, ASTNode* child);
 TypeInfo* ast_create_type(BaseType base);
+TypeInfo* ast_clone_type(TypeInfo* type);
 
 // Memory management
 void ast_free_node(ASTNode* node);

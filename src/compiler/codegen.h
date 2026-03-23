@@ -4,6 +4,8 @@
 #include "ast.h"
 
 void codegen_set_emit_cb(void (*cb)(const char*));
+void codegen_prologue(void);
+void codegen_top_level(ASTNode* node);
 void codegen(ASTNode* root);
 
 #endif

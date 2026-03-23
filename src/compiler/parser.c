@@ -535,9 +535,18 @@ static ASTNode* parse_declaration() {
   exit(1);
 }
 
-ASTNode* parse_program(int (*getchar_cb)(void)) {
+void parser_init(int (*getchar_cb)(void)) {
   lexer_init(getchar_cb);
   current_token = lexer_next_token();
+}
+
+ASTNode* parse_top_level_declaration(void) {
+  if (current_token.type == TOK_EOF) return NULL;
+  return parse_declaration();
+}
+
+ASTNode* parse_program(int (*getchar_cb)(void)) {
+  parser_init(getchar_cb);
 
   ASTNode* prog = ast_create_node(AST_PROGRAM, 0);
   while (current_token.type != TOK_EOF) {
