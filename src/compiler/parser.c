@@ -123,6 +123,28 @@ static ASTNode* parse_postfix() {
       post->as.single_expr.expr = node;
       advance_token();
       node = post;
+    } else if (check(TOK_LPAREN)) {
+      if (node->type != AST_VAR_ACCESS) {
+        fprintf(stderr, "Error at line %d: Indirect function calls not supported\n", current_token.line);
+        exit(1);
+      }
+      ASTNode* call_node = ast_create_node(AST_FUNC_CALL, current_token.line);
+      call_node->as.call.name = node->as.var.name;
+      ast_free_node(node);
+      advance_token();
+      if (!check(TOK_RPAREN)) {
+        while (true) {
+          ASTNode* arg = parse_expr();
+          ast_add_child(call_node, arg);
+          if (check(TOK_COMMA)) {
+            advance_token();
+          } else {
+            break;
+          }
+        }
+      }
+      match(TOK_RPAREN);
+      node = call_node;
     } else {
       break;
     }

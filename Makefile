@@ -2,8 +2,9 @@ CC = gcc
 CFLAGS = -Wall -Wextra -Isrc/compiler -Isrc/assembler
 COMPILER_SRC = src/compiler/lexer.c src/compiler/ast.c src/compiler/parser.c src/compiler/codegen.c src/compiler/preprocessor.c
 ASSEMBLER_SRC = src/assembler/dasm.c
+AVR_SRC = src/avr/main.c src/avr/clkctrl.c src/avr/usart.c 
 
-all: dcc dasm test_lexer test_parser test_codegen test_preprocessor test_dasm
+all: dcc dasm avr test_lexer test_parser test_codegen test_preprocessor test_dasm
 
 dcc: src/compiler/main.c $(COMPILER_SRC)
 	$(CC) $(CFLAGS) $^ -o $@
@@ -41,7 +42,7 @@ dcc.hex: dcc.elf
 	avr-objcopy -j .text -j .data -j .rodata -j .bss -O ihex $^ $@
 	avr-size $^
 
-dcc.elf: src/avr/avr_main.c src/avr/clkctrl.c src/avr/usart.c $(COMPILER_SRC) $(ASSEMBLER_SRC)
+dcc.elf: $(AVR_SRC) $(COMPILER_SRC) $(ASSEMBLER_SRC)
 	avr-gcc -mmcu=avr128db28 -DAVR_TARGET -DF_CPU=24000000U -Os -Isrc/compiler -Isrc/assembler -Isrc/avr $^ -o $@
 
 clean:

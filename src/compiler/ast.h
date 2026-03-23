@@ -36,7 +36,8 @@ typedef enum : uint8_t {
   AST_MEMBER_ACCESS,
   AST_VAR_ACCESS,
   AST_NUMBER,
-  AST_CAST
+  AST_CAST,
+  AST_FUNC_CALL
 } ASTNodeType;
 
 typedef struct ASTNode {
@@ -54,6 +55,11 @@ typedef struct ASTNode {
       struct ASTNode* body; // For AST_FUNC_DECL
       int array_size;       // For arrays in structs
     } decl;
+
+    // For AST_FUNC_CALL
+    struct {
+      char* name;
+    } call;
 
     // For AST_IF
     struct {

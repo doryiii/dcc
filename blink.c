@@ -1,3 +1,6 @@
+//typedef char uint8_t;
+//typedef short uint16_t;
+
 struct PORT_struct {
   uint8_t DIR;
   uint8_t DIRSET;
@@ -13,6 +16,10 @@ struct PORT_struct {
 #define PORTC (*(struct PORT_struct*)0x0440)
 #define PORTA (*(struct PORT_struct*)0x0400)
 
+int blinkLED(struct PORT_struct* port, uint8_t pin) {
+  (*port).OUTTGL = 1 << pin;
+}
+
 int main(void) {
   uint8_t count = 0;
   uint8_t current = 0;
@@ -26,10 +33,11 @@ int main(void) {
     }
     count = count + 1;
     if (current == 0) {
-      PORTC.OUTTGL = 1 << 2;
+      blinkLED(&PORTC, 2);
     } else {
-      PORTA.OUTTGL = 1 << 7;
+      blinkLED(&PORTA, 7);
     }
   }
   return 1;
 }
+

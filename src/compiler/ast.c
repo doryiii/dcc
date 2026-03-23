@@ -122,6 +122,7 @@ void ast_free_node(ASTNode* node) {
     case AST_PROGRAM:
     case AST_BLOCK:
     case AST_NUMBER:
+    case AST_FUNC_CALL:
       // Handled by generic children or no dynamic memory
       break;
   }
@@ -203,6 +204,9 @@ void ast_print(ASTNode* node, int indent) {
       break;
     case AST_CAST:
       printf("Cast: %s\n", type_to_string(node->as.single_expr.var_type));
+      break;
+    case AST_FUNC_CALL:
+      printf("FuncCall: %s\n", node->as.call.name);
       break;
   }
 
