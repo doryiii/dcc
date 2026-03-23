@@ -22,7 +22,7 @@ volatile USART_t* dev[3] = {
 
 static uint8_t usart_console;
 
-static int usart_putc_f(char c, FILE *stream) {
+static int usart_putc_f(char c, FILE *stream __attribute__((unused))) {
   if (c == '\n') {
     usart_putc(usart_console, '\r');
   }

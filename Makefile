@@ -3,6 +3,7 @@ CFLAGS = -Wall -Wextra -Isrc/compiler -Isrc/assembler
 COMPILER_SRC = src/compiler/lexer.c src/compiler/ast.c src/compiler/parser.c src/compiler/codegen.c src/compiler/preprocessor.c
 ASSEMBLER_SRC = src/assembler/dasm.c
 AVR_SRC = src/avr/main.c src/avr/clkctrl.c src/avr/usart.c 
+AVR_CFLAGS = -mmcu=avr128db28 -DAVR_TARGET -DF_CPU=24000000U
 
 all: dcc dasm avr test_lexer test_parser test_codegen test_preprocessor test_dasm
 
@@ -43,7 +44,7 @@ dcc.hex: dcc.elf
 	avr-size $^
 
 dcc.elf: $(AVR_SRC) $(COMPILER_SRC) $(ASSEMBLER_SRC)
-	avr-gcc -mmcu=avr128db28 -DAVR_TARGET -DF_CPU=24000000U -Os -Isrc/compiler -Isrc/assembler -Isrc/avr $^ -o $@
+	avr-gcc $(AVR_CFLAGS) -Os $(CFLAGS) -Isrc/avr $^ -o $@
 
 clean:
 	rm -f test_lexer test_parser test_codegen test_preprocessor test_dasm dcc dasm dcc.elf dcc.hex tests/blink.bin tests/blink.hex
