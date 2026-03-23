@@ -104,8 +104,7 @@ int test_dasm_or() {
   // 0x2800 | 0x0200 | 0x0180 | 0x0009 = 0x2B89
   if (code[0] != 0x2B89) {
     fprintf(
-        stderr,
-        "FAIL: test_dasm_or: or r24, r25 expected 0x2B89, got 0x%04X\n",
+        stderr, "FAIL: test_dasm_or: or r24, r25 expected 0x2B89, got 0x%04X\n",
         code[0]
     );
     return 1;

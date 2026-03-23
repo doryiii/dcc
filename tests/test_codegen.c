@@ -131,7 +131,9 @@ int test_codegen_not() {
   out_file = NULL;
 
   if (strstr(buffer, "or r24, r25") == NULL) {
-    fprintf(stderr, "FAIL: test_codegen_not: expected 'or r24, r25' in output\n");
+    fprintf(
+        stderr, "FAIL: test_codegen_not: expected 'or r24, r25' in output\n"
+    );
     return 1;
   }
 

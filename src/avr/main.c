@@ -3,9 +3,9 @@
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <util/delay.h>
 
@@ -102,7 +102,7 @@ int avr_getchar(void) {
   return c;
 }
 
-extern void *__brkval;
+extern void* __brkval;
 
 static uint16_t get_free_ram(void) {
   uint16_t free_memory;

@@ -72,7 +72,8 @@ static ASTNode* parse_primary() {
   ASTNode* node = NULL;
   if (check(TOK_NUMBER)) {
     node = ast_create_node(AST_NUMBER, current_token.line);
-    node->as.number.int_val = strtol(current_token.text, NULL, 0);  // Handles 0x
+    node->as.number.int_val =
+        strtol(current_token.text, NULL, 0);  // Handles 0x
     advance_token();
   } else if (check(TOK_IDENTIFIER)) {
     node = ast_create_node(AST_VAR_ACCESS, current_token.line);
@@ -125,7 +126,10 @@ static ASTNode* parse_postfix() {
       node = post;
     } else if (check(TOK_LPAREN)) {
       if (node->type != AST_VAR_ACCESS) {
-        fprintf(stderr, "Error at line %d: Indirect function calls not supported\n", current_token.line);
+        fprintf(
+            stderr, "Error at line %d: Indirect function calls not supported\n",
+            current_token.line
+        );
         exit(1);
       }
       ASTNode* call_node = ast_create_node(AST_FUNC_CALL, current_token.line);

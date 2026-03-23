@@ -107,6 +107,14 @@ void dasm_apply_fixups(
       } else if (f->type == 3) {  // LDI HI8
         uint8_t k = (address >> 8) & 0xFF;
         op |= ((k & 0xF0) << 4) | (k & 0x0F);
+      } else if (f->type == 4) {  // LDI PM_LO8
+        int offset = (address - (f->patch_address - 4)) / 2;
+        uint8_t k = offset & 0xFF;
+        op |= ((k & 0xF0) << 4) | (k & 0x0F);
+      } else if (f->type == 5) {  // LDI PM_HI8
+        int offset = (address - (f->patch_address - 6)) / 2;
+        uint8_t k = (offset >> 8) & 0xFF;
+        op |= ((k & 0xF0) << 4) | (k & 0x0F);
       }
 
       page_buf[offset] = op & 0xFF;
@@ -338,7 +346,18 @@ int dasm_emit(const char* asm_line, uint32_t* out_inst) {
             bool lo = (args[1].text[0] == 'l');
             fixup_type = lo ? 2 : 3;
             // args[2] is '('
-            if (args[3].type == ASM_TOK_IDENTIFIER) {
+            if (args[3].type == ASM_TOK_IDENTIFIER &&
+                strcmp(args[3].text, "pm") == 0) {
+              fixup_type = lo ? 4 : 5;
+              const char* target = args[5].text;
+              uint32_t val = find_symbol(target);
+              if (val == 0xFFFFFFFF) {
+                add_fixup(target, dasm_pc, fixup_type);
+              } else {
+                int offset = (val - (dasm_pc - (lo ? 4 : 6))) / 2;
+                k = lo ? (offset & 0xFF) : ((offset >> 8) & 0xFF);
+              }
+            } else if (args[3].type == ASM_TOK_IDENTIFIER) {
               uint32_t val = find_symbol(args[3].text);
               if (val == 0xFFFFFFFF) {
                 add_fixup(args[3].text, dasm_pc, fixup_type);
@@ -414,6 +433,12 @@ int dasm_emit(const char* asm_line, uint32_t* out_inst) {
         encoded = true;
       } else if (strcmp(mnemonic, "ret") == 0) {
         op = 0x9508;
+        encoded = true;
+      } else if (strcmp(mnemonic, "icall") == 0) {
+        op = 0x9509;
+        encoded = true;
+      } else if (strcmp(mnemonic, "ijmp") == 0) {
+        op = 0x9409;
         encoded = true;
       } else if (strcmp(mnemonic, "push") == 0) {
         int d = get_reg(args[0].text);

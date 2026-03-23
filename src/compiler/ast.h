@@ -52,8 +52,8 @@ typedef struct ASTNode {
     struct {
       char* name;
       TypeInfo* var_type;
-      struct ASTNode* body; // For AST_FUNC_DECL
-      int array_size;       // For arrays in structs
+      struct ASTNode* body;  // For AST_FUNC_DECL
+      int array_size;        // For arrays in structs
     } decl;
 
     // For AST_FUNC_CALL
@@ -79,8 +79,8 @@ typedef struct ASTNode {
     // For AST_RETURN, AST_EXPR_STMT, AST_UNARY_OP, AST_CAST
     struct {
       struct ASTNode* expr;
-      int op;             // Unary/Binary op token type
-      TypeInfo* var_type; // For AST_CAST
+      int op;              // Unary/Binary op token type
+      TypeInfo* var_type;  // For AST_CAST
     } single_expr;
 
     // For AST_ASSIGN, AST_BINARY_OP
@@ -92,7 +92,7 @@ typedef struct ASTNode {
 
     // For AST_MEMBER_ACCESS
     struct {
-      struct ASTNode* expr; // The object being accessed
+      struct ASTNode* expr;  // The object being accessed
       char* member_name;
     } member;
 

@@ -1,5 +1,5 @@
-//typedef char uint8_t;
-//typedef short uint16_t;
+// typedef char uint8_t;
+// typedef short uint16_t;
 
 struct PORT_struct {
   uint8_t DIR;
@@ -40,4 +40,3 @@ int main(void) {
   }
   return 1;
 }
-

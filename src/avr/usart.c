@@ -1,11 +1,11 @@
 #include "usart.h"
 
-#include <stdio.h>
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <util/atomic.h>
 
 #include "gpio.h"
@@ -22,7 +22,7 @@ volatile USART_t* dev[3] = {
 
 static uint8_t usart_console;
 
-static int usart_putc_f(char c, FILE *stream __attribute__((unused))) {
+static int usart_putc_f(char c, FILE* stream __attribute__((unused))) {
   if (c == '\n') {
     usart_putc(usart_console, '\r');
   }
@@ -30,7 +30,8 @@ static int usart_putc_f(char c, FILE *stream __attribute__((unused))) {
   return 0;
 }
 
-static FILE usart_stdout = FDEV_SETUP_STREAM(usart_putc_f, NULL, _FDEV_SETUP_WRITE);
+static FILE usart_stdout =
+    FDEV_SETUP_STREAM(usart_putc_f, NULL, _FDEV_SETUP_WRITE);
 
 void usart_console_init(uint8_t n, uint32_t baud) {
   usart_console = n;

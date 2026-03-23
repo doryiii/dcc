@@ -16,7 +16,8 @@ char* intern_string(const char* str) {
   for (StringPoolNode* node = string_pool; node != NULL; node = node->next) {
     if (strcmp(node->str, str) == 0) return node->str;
   }
-  StringPoolNode* new_node = (StringPoolNode*)malloc(sizeof(StringPoolNode) + strlen(str) + 1);
+  StringPoolNode* new_node =
+      (StringPoolNode*)malloc(sizeof(StringPoolNode) + strlen(str) + 1);
   strcpy(new_node->str, str);
   new_node->next = string_pool;
   string_pool = new_node;
@@ -86,8 +87,10 @@ void ast_free_node(ASTNode* node) {
 
     case AST_IF:
       if (node->as.if_stmt.cond) ast_free_node(node->as.if_stmt.cond);
-      if (node->as.if_stmt.then_branch) ast_free_node(node->as.if_stmt.then_branch);
-      if (node->as.if_stmt.else_branch) ast_free_node(node->as.if_stmt.else_branch);
+      if (node->as.if_stmt.then_branch)
+        ast_free_node(node->as.if_stmt.then_branch);
+      if (node->as.if_stmt.else_branch)
+        ast_free_node(node->as.if_stmt.else_branch);
       break;
 
     case AST_WHILE:
@@ -103,7 +106,8 @@ void ast_free_node(ASTNode* node) {
     case AST_UNARY_OP:
     case AST_CAST:
       if (node->as.single_expr.expr) ast_free_node(node->as.single_expr.expr);
-      if (node->as.single_expr.var_type) ast_free_type(node->as.single_expr.var_type);
+      if (node->as.single_expr.var_type)
+        ast_free_type(node->as.single_expr.var_type);
       break;
 
     case AST_ASSIGN:
@@ -158,13 +162,19 @@ void ast_print(ASTNode* node, int indent) {
       printf("Program\n");
       break;
     case AST_VAR_DECL:
-      printf("VarDecl: %s %s\n", type_to_string(node->as.decl.var_type), node->as.decl.name);
+      printf(
+          "VarDecl: %s %s\n", type_to_string(node->as.decl.var_type),
+          node->as.decl.name
+      );
       break;
     case AST_STRUCT_DECL:
       printf("StructDecl: %s\n", node->as.decl.name);
       break;
     case AST_FUNC_DECL:
-      printf("FuncDecl: %s %s\n", type_to_string(node->as.decl.var_type), node->as.decl.name);
+      printf(
+          "FuncDecl: %s %s\n", type_to_string(node->as.decl.var_type),
+          node->as.decl.name
+      );
       break;
     case AST_BLOCK:
       printf("Block\n");
@@ -257,8 +267,10 @@ void ast_print(ASTNode* node, int indent) {
     }
   }
 
-  if (node->type == AST_RETURN || node->type == AST_EXPR_STMT || node->type == AST_UNARY_OP || node->type == AST_CAST) {
-    if (node->as.single_expr.expr) ast_print(node->as.single_expr.expr, indent + 1);
+  if (node->type == AST_RETURN || node->type == AST_EXPR_STMT ||
+      node->type == AST_UNARY_OP || node->type == AST_CAST) {
+    if (node->as.single_expr.expr)
+      ast_print(node->as.single_expr.expr, indent + 1);
   }
 
   if (node->type == AST_ASSIGN || node->type == AST_BINARY_OP) {

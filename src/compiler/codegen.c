@@ -52,7 +52,7 @@ static void visit_struct_decl(ASTNode* node) {
   StructDef* sd = (StructDef*)calloc(1, sizeof(StructDef));
   sd->name = intern_string(node->as.decl.name);
   int offset = 0;
-  
+
   ASTNode* mem_node = node->first_child;
   while (mem_node) {
     Member* m = (Member*)calloc(1, sizeof(Member));
@@ -61,13 +61,14 @@ static void visit_struct_decl(ASTNode* node) {
     m->type = mem_node->as.decl.var_type;
 
     int element_size = 1;
-    if (m->type && (m->type->base == TYPE_UINT16 || m->type->base == TYPE_INT || m->type->base == TYPE_POINTER))
+    if (m->type && (m->type->base == TYPE_UINT16 || m->type->base == TYPE_INT ||
+                    m->type->base == TYPE_POINTER))
       element_size = 2;
 
     offset += element_size * mem_node->as.decl.array_size;
     m->next = sd->members;
     sd->members = m;
-    
+
     mem_node = mem_node->next_sibling;
   }
   sd->size = offset;
@@ -131,7 +132,16 @@ static void visit_program(ASTNode* node) {
   EMIT("    ldi r29, 0x7F\n");
   EMIT("    out 0x3D, r28 ; SPL\n");
   EMIT("    out 0x3E, r29 ; SPH\n\n");
-  EMIT("    rcall main\n");
+  int l_get_pc = next_label();
+  EMIT("    rcall L_get_pc_%d\n", l_get_pc);
+  EMIT("L_get_pc_%d:\n", l_get_pc);
+  EMIT("    pop r31\n");
+  EMIT("    pop r30\n");
+  EMIT("    ldi r26, lo8(pm(main - L_get_pc_%d))\n", l_get_pc);
+  EMIT("    ldi r27, hi8(pm(main - L_get_pc_%d))\n", l_get_pc);
+  EMIT("    add r30, r26\n");
+  EMIT("    adc r31, r27\n");
+  EMIT("    icall\n");
   EMIT("L_inf_loop:\n");
   EMIT("    rjmp L_inf_loop\n\n");
 
@@ -147,8 +157,10 @@ static int calculate_stack_size(ASTNode* node) {
   int size = 0;
   if (node->type == AST_VAR_DECL) {
     size = 1;
-    if (node->as.decl.var_type && (node->as.decl.var_type->base == TYPE_UINT16 ||
-                           node->as.decl.var_type->base == TYPE_INT || node->as.decl.var_type->base == TYPE_POINTER))
+    if (node->as.decl.var_type &&
+        (node->as.decl.var_type->base == TYPE_UINT16 ||
+         node->as.decl.var_type->base == TYPE_INT ||
+         node->as.decl.var_type->base == TYPE_POINTER))
       size = 2;
   }
 
@@ -157,14 +169,19 @@ static int calculate_stack_size(ASTNode* node) {
     size += calculate_stack_size(child);
     child = child->next_sibling;
   }
-  
-  if (node->type == AST_FUNC_DECL && node->as.decl.body) size += calculate_stack_size(node->as.decl.body);
+
+  if (node->type == AST_FUNC_DECL && node->as.decl.body)
+    size += calculate_stack_size(node->as.decl.body);
   if (node->type == AST_IF) {
-    if (node->as.if_stmt.then_branch) size += calculate_stack_size(node->as.if_stmt.then_branch);
-    if (node->as.if_stmt.else_branch) size += calculate_stack_size(node->as.if_stmt.else_branch);
+    if (node->as.if_stmt.then_branch)
+      size += calculate_stack_size(node->as.if_stmt.then_branch);
+    if (node->as.if_stmt.else_branch)
+      size += calculate_stack_size(node->as.if_stmt.else_branch);
   }
-  if ((node->type == AST_WHILE || node->type == AST_FOR) && node->as.loop.body) size += calculate_stack_size(node->as.loop.body);
-  if (node->type == AST_FOR && node->as.loop.init && node->as.loop.init->type == AST_VAR_DECL)
+  if ((node->type == AST_WHILE || node->type == AST_FOR) && node->as.loop.body)
+    size += calculate_stack_size(node->as.loop.body);
+  if (node->type == AST_FOR && node->as.loop.init &&
+      node->as.loop.init->type == AST_VAR_DECL)
     size += calculate_stack_size(node->as.loop.init);
 
   return size;
@@ -173,7 +190,7 @@ static int calculate_stack_size(ASTNode* node) {
 static void visit_func_decl(ASTNode* node) {
   clear_symbols();
   int total_stack = calculate_stack_size(node->as.decl.body);
-  
+
   ASTNode* child = node->first_child;
   while (child) {
     total_stack += calculate_stack_size(child);
@@ -209,9 +226,14 @@ static void visit_func_decl(ASTNode* node) {
   while (param) {
     int reg = 24 - (arg_idx * 2);
     int size = 1;
-    if (param->as.decl.var_type && (param->as.decl.var_type->base == TYPE_UINT16 || param->as.decl.var_type->base == TYPE_INT || param->as.decl.var_type->base == TYPE_POINTER))
+    if (param->as.decl.var_type &&
+        (param->as.decl.var_type->base == TYPE_UINT16 ||
+         param->as.decl.var_type->base == TYPE_INT ||
+         param->as.decl.var_type->base == TYPE_POINTER))
       size = 2;
-    push_symbol(param->as.decl.name, state.stack_offset, param->as.decl.var_type);
+    push_symbol(
+        param->as.decl.name, state.stack_offset, param->as.decl.var_type
+    );
     if (size == 1) {
       EMIT("    std Y+%d, r%d\n", state.stack_offset, reg);
     } else {
@@ -243,8 +265,9 @@ static void visit_func_decl(ASTNode* node) {
 
 static void visit_var_decl(ASTNode* node) {
   int size = 1;
-  if (node->as.decl.var_type &&
-      (node->as.decl.var_type->base == TYPE_UINT16 || node->as.decl.var_type->base == TYPE_INT || node->as.decl.var_type->base == TYPE_POINTER))
+  if (node->as.decl.var_type && (node->as.decl.var_type->base == TYPE_UINT16 ||
+                                 node->as.decl.var_type->base == TYPE_INT ||
+                                 node->as.decl.var_type->base == TYPE_POINTER))
     size = 2;
 
   push_symbol(node->as.decl.name, state.stack_offset, node->as.decl.var_type);
@@ -258,12 +281,15 @@ static void visit_var_decl(ASTNode* node) {
 static void visit_var_access(ASTNode* node) {
   Symbol* s = find_symbol(node->as.var.name);
   if (!s) {
-    fprintf(stderr, "Codegen error: variable %s not found\n", node->as.var.name);
+    fprintf(
+        stderr, "Codegen error: variable %s not found\n", node->as.var.name
+    );
     return;
   }
 
   int size = 1;
-  if (s->type && (s->type->base == TYPE_UINT16 || s->type->base == TYPE_INT || s->type->base == TYPE_POINTER))
+  if (s->type && (s->type->base == TYPE_UINT16 || s->type->base == TYPE_INT ||
+                  s->type->base == TYPE_POINTER))
     size = 2;
 
   if (size == 1) {
@@ -324,7 +350,9 @@ static void visit_lvalue(ASTNode* node) {
       EMIT("    ldi r30, lo8(%s)\n", node->as.var.name);
       EMIT("    ldi r31, hi8(%s)\n", node->as.var.name);
     }
-  } else if (node->type == AST_UNARY_OP && node->as.single_expr.op == TOK_STAR) {
+  } else if (
+      node->type == AST_UNARY_OP && node->as.single_expr.op == TOK_STAR
+  ) {
     visit(node->as.single_expr.expr);
     EMIT("    movw r30, r24\n");
   } else if (node->type == AST_MEMBER_ACCESS) {
@@ -385,7 +413,9 @@ static void visit_unary_op(ASTNode* node) {
   } else if (node->as.single_expr.op == TOK_AMP) {
     visit_lvalue(node->as.single_expr.expr);
     EMIT("    movw r24, r30\n");
-  } else if (node->as.single_expr.op == TOK_INC || node->as.single_expr.op == TOK_DEC) {
+  } else if (
+      node->as.single_expr.op == TOK_INC || node->as.single_expr.op == TOK_DEC
+  ) {
     visit_lvalue(node->as.single_expr.expr);  // address in Z
     TypeInfo* t = get_expr_type(node->as.single_expr.expr);
     int size = 1;
@@ -633,18 +663,34 @@ static void visit_func_call(ASTNode* node) {
     num_args++;
     arg = arg->next_sibling;
   }
-  
+
   for (int i = num_args - 1; i >= 0; i--) {
     int reg = 24 - (i * 2);
     if (reg < 8) {
-      fprintf(stderr, "Codegen error: Too many arguments for %s\n", node->as.call.name);
+      fprintf(
+          stderr, "Codegen error: Too many arguments for %s\n",
+          node->as.call.name
+      );
       exit(1);
     }
     EMIT("    pop r%d\n", reg + 1);
     EMIT("    pop r%d\n", reg);
   }
 
-  EMIT("    rcall %s\n", node->as.call.name);
+  int l_get_pc = next_label();
+  EMIT("    rcall L_get_pc_%d\n", l_get_pc);
+  EMIT("L_get_pc_%d:\n", l_get_pc);
+  EMIT("    pop r31\n");
+  EMIT("    pop r30\n");
+  EMIT(
+      "    ldi r26, lo8(pm(%s - L_get_pc_%d))\n", node->as.call.name, l_get_pc
+  );
+  EMIT(
+      "    ldi r27, hi8(pm(%s - L_get_pc_%d))\n", node->as.call.name, l_get_pc
+  );
+  EMIT("    add r30, r26\n");
+  EMIT("    adc r31, r27\n");
+  EMIT("    icall\n");
 }
 
 static void visit(ASTNode* node) {
