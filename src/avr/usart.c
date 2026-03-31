@@ -11,10 +11,17 @@
 
 #include "gpio.h"
 
-static volatile uint8_t* usart_rx_buf[3] = {NULL, NULL, NULL};
-static volatile uint8_t usart_rx_bufindex[3], usart_rx_buflen[3];
-static volatile uint8_t* usart_tx_buf[3] = {NULL, NULL, NULL};
-static volatile uint8_t usart_tx_bufindex[3], usart_tx_buflen[3];
+typedef struct {
+  uint8_t* rx_buf;
+  uint8_t rx_bufindex;
+  uint8_t rx_buflen;
+  uint8_t* tx_buf;
+  uint8_t tx_bufindex;
+  uint8_t tx_buflen;
+} usart_state_t;
+
+static volatile usart_state_t* usart_states[3] = {NULL, NULL, NULL};
+
 volatile USART_t* dev[3] = {
     (USART_t*)0x0800,
     (USART_t*)0x0820,
@@ -42,8 +49,11 @@ void usart_console_init(uint8_t n, uint32_t baud) {
 
 void usart_init(uint8_t n, uint32_t baud) {
   if (n < 3) {
-    if (!usart_rx_buf[n]) usart_rx_buf[n] = (uint8_t*)malloc(USART_BUFSIZE);
-    if (!usart_tx_buf[n]) usart_tx_buf[n] = (uint8_t*)malloc(USART_BUFSIZE);
+    if (!usart_states[n]) {
+      usart_states[n] = (usart_state_t*)calloc(1, sizeof(usart_state_t));
+      usart_states[n]->rx_buf = (uint8_t*)malloc(USART_BUFSIZE);
+      usart_states[n]->tx_buf = (uint8_t*)malloc(USART_BUFSIZE);
+    }
   }
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     switch (n) {
@@ -71,35 +81,35 @@ void usart_init(uint8_t n, uint32_t baud) {
 }
 
 void usart_putc(uint8_t n, char c) {
-  if (n >= 3 || !usart_tx_buf[n]) return;
-  while (usart_tx_buflen[n] >= USART_BUFSIZE);
-  // the only other thing modifying buflen only decreases it.
+  if (n >= 3 || !usart_states[n]) return;
+  while (usart_states[n]->tx_buflen >= USART_BUFSIZE);
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-    uint8_t i = (usart_tx_bufindex[n] + usart_tx_buflen[n]++) % USART_BUFSIZE;
-    usart_tx_buf[n][i] = c;
+    uint8_t i = (usart_states[n]->tx_bufindex + usart_states[n]->tx_buflen++) %
+                USART_BUFSIZE;
+    usart_states[n]->tx_buf[i] = c;
     dev[n]->STATUS |= USART_TXCIF_bm;
     dev[n]->CTRLA |= USART_DREIE_bm;
   }
 }
 
 uint8_t usart_available(uint8_t n) {
-  return (n < 3 && usart_rx_buf[n]) ? usart_rx_buflen[n] : 0;
+  return (n < 3 && usart_states[n]) ? usart_states[n]->rx_buflen : 0;
 }
 
 void usart_tx_flush(uint8_t n) {
-  if (n >= 3 || !usart_tx_buf[n]) return;
-  while (usart_tx_buflen[n]);
+  if (n >= 3 || !usart_states[n]) return;
+  while (usart_states[n]->tx_buflen);
   while (dev[n]->CTRLA & USART_DREIE_bm);
   while (!(dev[n]->STATUS & USART_TXCIF_bm));
 }
 
 uint8_t usart_getc(uint8_t n) {
-  if (n >= 3 || !usart_rx_buf[n] || usart_rx_buflen[n] == 0) return 0;
+  if (n >= 3 || !usart_states[n] || usart_states[n]->rx_buflen == 0) return 0;
   uint8_t c;
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-    c = usart_rx_buf[n][usart_rx_bufindex[n]++];
-    usart_rx_bufindex[n] = usart_rx_bufindex[n] % USART_BUFSIZE;
-    usart_rx_buflen[n]--;
+    c = usart_states[n]->rx_buf[usart_states[n]->rx_bufindex++];
+    usart_states[n]->rx_bufindex %= USART_BUFSIZE;
+    usart_states[n]->rx_buflen--;
   }
   return c;
 }
@@ -123,12 +133,12 @@ void usart_write_P(uint8_t n, const char* c, uint32_t len) {
 
 // Write 1 byte from buffer if buffer not empty
 static inline void write_ready_isr(uint8_t n) {
-  if (!usart_tx_buf[n]) return;
-  if (usart_tx_buflen[n] > 0) {
-    dev[n]->TXDATAL = usart_tx_buf[n][usart_tx_bufindex[n]++];
-    usart_tx_bufindex[n] %= USART_BUFSIZE;
-    usart_tx_buflen[n]--;
-    if (usart_tx_buflen[n] == 0) {
+  if (!usart_states[n]) return;
+  if (usart_states[n]->tx_buflen > 0) {
+    dev[n]->TXDATAL = usart_states[n]->tx_buf[usart_states[n]->tx_bufindex++];
+    usart_states[n]->tx_bufindex %= USART_BUFSIZE;
+    usart_states[n]->tx_buflen--;
+    if (usart_states[n]->tx_buflen == 0) {
       dev[n]->CTRLA &= ~USART_DREIE_bm;
     }
   }
@@ -140,10 +150,11 @@ ISR(USART2_DRE_vect, ISR_BLOCK) { write_ready_isr(2); }
 // Read 1 byte to buffer whenever a byte arrives. If buffer full, drop byte.
 static inline void read_avail_isr(uint8_t n) {
   uint8_t c = dev[n]->RXDATAL;
-  if (!usart_rx_buf[n]) return;
-  if (usart_rx_buflen[n] < USART_BUFSIZE) {
-    uint8_t i = (usart_rx_bufindex[n] + usart_rx_buflen[n]++) % USART_BUFSIZE;
-    usart_rx_buf[n][i] = c;
+  if (!usart_states[n]) return;
+  if (usart_states[n]->rx_buflen < USART_BUFSIZE) {
+    uint8_t i = (usart_states[n]->rx_bufindex + usart_states[n]->rx_buflen++) %
+                USART_BUFSIZE;
+    usart_states[n]->rx_buf[i] = c;
   }
 }
 ISR(USART0_RXC_vect, ISR_BLOCK) { read_avail_isr(0); }

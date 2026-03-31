@@ -332,9 +332,8 @@ static void visit_lvalue(ASTNode* node) {
       EMIT("    ldi r30, lo8(%s)\n", node->as.var.name);
       EMIT("    ldi r31, hi8(%s)\n", node->as.var.name);
     }
-  } else if (
-      node->type == AST_UNARY_OP && node->as.single_expr.op == TOK_STAR
-  ) {
+  } else if (node->type == AST_UNARY_OP &&
+             node->as.single_expr.op == TOK_STAR) {
     visit(node->as.single_expr.expr);
     EMIT("    movw r30, r24\n");
   } else if (node->type == AST_MEMBER_ACCESS) {
@@ -395,9 +394,8 @@ static void visit_unary_op(ASTNode* node) {
   } else if (node->as.single_expr.op == TOK_AMP) {
     visit_lvalue(node->as.single_expr.expr);
     EMIT("    movw r24, r30\n");
-  } else if (
-      node->as.single_expr.op == TOK_INC || node->as.single_expr.op == TOK_DEC
-  ) {
+  } else if (node->as.single_expr.op == TOK_INC ||
+             node->as.single_expr.op == TOK_DEC) {
     visit_lvalue(node->as.single_expr.expr);  // address in Z
     TypeInfo* t = get_expr_type(node->as.single_expr.expr);
     int size = 1;

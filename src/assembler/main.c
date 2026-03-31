@@ -36,10 +36,8 @@ int main(int argc, char** argv) {
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
       bin_out = fopen(argv[++i], "wb");
-    } else if (
-        (strcmp(argv[i], "-hex") == 0 || strcmp(argv[i], "-h") == 0) &&
-        i + 1 < argc
-    ) {
+    } else if ((strcmp(argv[i], "-hex") == 0 || strcmp(argv[i], "-h") == 0) &&
+               i + 1 < argc) {
       hex_out = fopen(argv[++i], "w");
     } else if (argv[i][0] == '-') {
       fprintf(stderr, "Unknown or incomplete argument: %s\n", argv[i]);

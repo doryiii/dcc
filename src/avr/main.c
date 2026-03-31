@@ -139,6 +139,42 @@ static void avr_emit_cb(const char* line) {
   }
 }
 
+static void register_bootloader_symbols() {
+  dasm_add_symbol(
+      "usart_console_init",
+      (uint32_t)(uint16_t)&usart_console_init * 2 - APP_START
+  );
+  dasm_add_symbol(
+      "usart_init", (uint32_t)(uint16_t)&usart_init * 2 - APP_START
+  );
+  dasm_add_symbol(
+      "usart_putc", (uint32_t)(uint16_t)&usart_putc * 2 - APP_START
+  );
+  dasm_add_symbol(
+      "usart_print", (uint32_t)(uint16_t)&usart_print * 2 - APP_START
+  );
+  dasm_add_symbol(
+      "usart_print_P", (uint32_t)(uint16_t)&usart_print_P * 2 - APP_START
+  );
+  dasm_add_symbol(
+      "usart_write_P", (uint32_t)(uint16_t)&usart_write_P * 2 - APP_START
+  );
+  dasm_add_symbol(
+      "usart_available", (uint32_t)(uint16_t)&usart_available * 2 - APP_START
+  );
+  dasm_add_symbol(
+      "usart_tx_flush", (uint32_t)(uint16_t)&usart_tx_flush * 2 - APP_START
+  );
+  dasm_add_symbol(
+      "usart_getc", (uint32_t)(uint16_t)&usart_getc * 2 - APP_START
+  );
+  dasm_add_symbol("set_clock", (uint32_t)(uint16_t)&set_clock * 2 - APP_START);
+  dasm_add_symbol(
+      "start_rtc_pit_isr",
+      (uint32_t)(uint16_t)&start_rtc_pit_isr * 2 - APP_START
+  );
+}
+
 void dasm_read_page_cb(uint32_t page_addr, uint8_t* page_buf) {
   read_page(APP_START + page_addr, page_buf);
 }
@@ -164,6 +200,7 @@ int main(void) {
 
   printf_P(PSTR("Free RAM: %u\r\n"), get_free_ram());
   dasm_init();
+  register_bootloader_symbols();
   preprocessor_init(avr_getchar);
   parser_init(preprocessor_getchar);
   codegen_set_emit_cb(avr_emit_cb);

@@ -44,7 +44,7 @@ static Symbol* symbols = NULL;
 static Fixup* fixups = NULL;
 static uint32_t dasm_pc = 0;
 
-static void add_symbol(const char* name, uint32_t address) {
+void dasm_add_symbol(const char* name, uint32_t address) {
   Symbol* s = (Symbol*)malloc(sizeof(Symbol) + strlen(name) + 1);
   strcpy(s->name, name);
   s->address = address;
@@ -296,7 +296,7 @@ int dasm_emit(const char* asm_line, uint32_t* out_inst) {
     }
 
     if (t.type == ASM_TOK_LABEL) {
-      add_symbol(t.text, dasm_pc);
+      dasm_add_symbol(t.text, dasm_pc);
       continue;
     }
 
@@ -314,7 +314,7 @@ int dasm_emit(const char* asm_line, uint32_t* out_inst) {
         s = temp + 1;
         AsmToken val_tok = next_asm_token(&s);
         if (val_tok.type == ASM_TOK_NUMBER) {
-          add_symbol(t.text, val_tok.value);
+          dasm_add_symbol(t.text, val_tok.value);
         }
         while (t.type != ASM_TOK_NEWLINE && t.type != ASM_TOK_EOF) {
           t = next_asm_token(&s);
@@ -381,9 +381,8 @@ int dasm_emit(const char* asm_line, uint32_t* out_inst) {
 
         op = 0xE000 | ((k & 0xF0) << 4) | ((d & 0x0F) << 4) | (k & 0x0F);
         encoded = true;
-      } else if (
-          strcmp(mnemonic, "rcall") == 0 || strcmp(mnemonic, "rjmp") == 0
-      ) {
+      } else if (strcmp(mnemonic, "rcall") == 0 ||
+                 strcmp(mnemonic, "rjmp") == 0) {
         uint32_t target = find_symbol(args[0].text);
         int k = 0;
         if (target == 0xFFFFFFFF) {
@@ -393,10 +392,10 @@ int dasm_emit(const char* asm_line, uint32_t* out_inst) {
         }
         op = (strcmp(mnemonic, "rcall") == 0 ? 0xD000 : 0xC000) | (k & 0x0FFF);
         encoded = true;
-      } else if (
-          strcmp(mnemonic, "brlo") == 0 || strcmp(mnemonic, "brne") == 0 ||
-          strcmp(mnemonic, "breq") == 0 || strcmp(mnemonic, "brlt") == 0
-      ) {
+      } else if (strcmp(mnemonic, "brlo") == 0 ||
+                 strcmp(mnemonic, "brne") == 0 ||
+                 strcmp(mnemonic, "breq") == 0 ||
+                 strcmp(mnemonic, "brlt") == 0) {
         uint32_t target = find_symbol(args[0].text);
         int k = 0;
         if (target == 0xFFFFFFFF) {
@@ -478,9 +477,8 @@ int dasm_emit(const char* asm_line, uint32_t* out_inst) {
           op = 0x8000 | yz_bit | ((d & 0x1F) << 4) | ((q & 0x20) << 8) |
                ((q & 0x18) << 7) | (q & 0x07);
         encoded = true;
-      } else if (
-          strcmp(mnemonic, "adiw") == 0 || strcmp(mnemonic, "sbiw") == 0
-      ) {
+      } else if (strcmp(mnemonic, "adiw") == 0 ||
+                 strcmp(mnemonic, "sbiw") == 0) {
         int r = get_reg(args[0].text);
         int k = args[1].value;
         int d = (r - 24) / 2;
