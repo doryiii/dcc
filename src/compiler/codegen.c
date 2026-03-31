@@ -752,6 +752,25 @@ static void visit(ASTNode* node) {
   }
 }
 
+void codegen_cleanup(void) {
+  clear_symbols();
+
+  StructDef* sd = state.structs;
+  while (sd) {
+    StructDef* next_sd = sd->next;
+    Member* m = sd->members;
+    while (m) {
+      Member* next_m = m->next;
+      ast_free_type(m->type);
+      free(m);
+      m = next_m;
+    }
+    free(sd);
+    sd = next_sd;
+  }
+  state.structs = NULL;
+}
+
 void codegen_prologue(void) {
   state.label_count = 0;
   state.symbols = NULL;

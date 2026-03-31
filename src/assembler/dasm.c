@@ -272,8 +272,7 @@ static int parse_expr(AsmToken* args, int* idx, int num_args) {
   return 0;
 }
 
-void dasm_init(void) {
-  dasm_pc = 0;
+void dasm_cleanup(void) {
   while (symbols) {
     Symbol* s = symbols;
     symbols = s->next;
@@ -284,6 +283,11 @@ void dasm_init(void) {
     fixups = f->next;
     free(f);
   }
+}
+
+void dasm_init(void) {
+  dasm_pc = 0;
+  dasm_cleanup();
 }
 
 int dasm_emit(const char* asm_line, uint32_t* out_inst) {

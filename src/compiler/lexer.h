@@ -67,6 +67,7 @@ typedef struct {
 } Token;
 
 void lexer_init(int (*getchar_cb)(void));
+void lexer_cleanup(void);
 Token lexer_next_token(void);
 void lexer_free_token(Token* token);
 const char* lexer_token_type_name(TokenType type);

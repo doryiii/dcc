@@ -5,7 +5,8 @@
 #include "lexer.h"
 
 void parser_init(int (*getchar_cb)(void));
-ASTNode* parse_top_level_declaration(void);
+void parser_cleanup(void);
+ASTNode* parse_top_level_declaration();
 ASTNode* parse_program(int (*getchar_cb)(void));
 
 #endif

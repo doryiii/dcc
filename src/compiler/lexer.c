@@ -9,13 +9,22 @@ static int unget_buf = -1;
 static int (*get_char_cb)(void) = NULL;
 static int current_line = 1;
 
-static char lexeme[256];
+static char* lexeme = NULL;
+#define LEXEME_BUF_SIZE 256
 static int lexeme_len = 0;
 
 void lexer_init(int (*getchar_cb)(void)) {
   get_char_cb = getchar_cb;
   unget_buf = -1;
   current_line = 1;
+  if (!lexeme) lexeme = (char*)malloc(LEXEME_BUF_SIZE);
+}
+
+void lexer_cleanup(void) {
+  if (lexeme) {
+    free(lexeme);
+    lexeme = NULL;
+  }
 }
 
 static char peek() {
@@ -45,7 +54,7 @@ static void lexeme_clear() {
 }
 
 static void lexeme_append(char c) {
-  if (lexeme_len < (int)sizeof(lexeme) - 1) {
+  if (lexeme && lexeme_len < LEXEME_BUF_SIZE - 1) {
     lexeme[lexeme_len++] = c;
     lexeme[lexeme_len] = '\0';
   }

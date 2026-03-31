@@ -118,7 +118,7 @@ static uint16_t get_free_ram(void) {
 }
 
 static uint32_t avr_pc = APP_START;
-static uint8_t current_page_buf[PROGMEM_PAGE_SIZE];
+static uint8_t* current_page_buf = NULL;
 
 static void avr_emit_cb(const char* line) {
 #ifdef DEBUG_PRINT_ASM
@@ -195,6 +195,7 @@ int main(void) {
 
   _delay_ms(1000);
   printf_P(PSTR("Enter C source ending with EOT or NULL.\r\n"));
+  current_page_buf = (uint8_t*)malloc(PROGMEM_PAGE_SIZE);
   memset(current_page_buf, 0xFF, PROGMEM_PAGE_SIZE);
   avr_pc = APP_START;
 
@@ -227,9 +228,17 @@ int main(void) {
 
   printf_P(PSTR("Code generation done. Applying fixups...\r\n"));
   dasm_apply_fixups(dasm_read_page_cb, dasm_write_page_cb);
-  printf_P(PSTR("Final RAM low watermark: %u\r\n"), get_free_ram());
 
+  // Cleanup dynamically allocated memory before jumping
+  parser_cleanup();
+  dasm_cleanup();
+  codegen_cleanup();
+  preprocessor_cleanup();
   ast_free_string_pool();
+  free(current_page_buf);
+  current_page_buf = NULL;
+
+  printf_P(PSTR("Final RAM low watermark: %u\r\n"), get_free_ram());
 
   printf_P(PSTR("Done! Program size: %u\r\n"), (uint16_t)(avr_pc - APP_START));
   printf_P(PSTR("Jumping to app...\r\n"));

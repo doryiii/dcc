@@ -15,7 +15,8 @@ typedef struct Macro {
 
 static Macro* macros = NULL;
 static int (*underlying_getchar)(void) = NULL;
-static char pending_buf[256];
+static char* pending_buf = NULL;
+#define PENDING_BUF_SIZE 256
 static int pending_pos = 0;
 static int pending_len = 0;
 
@@ -27,6 +28,27 @@ static void add_macro(char* name, char* value, char** args, int num_args) {
   m->num_args = num_args;
   m->next = macros;
   macros = m;
+}
+
+void preprocessor_cleanup(void) {
+  Macro* m = macros;
+  while (m) {
+    Macro* next = m->next;
+    free(m->name);
+    free(m->value);
+    for (int i = 0; i < m->num_args; i++) {
+      free(m->args[i]);
+    }
+    free(m->args);
+    free(m);
+    m = next;
+  }
+  macros = NULL;
+
+  if (pending_buf) {
+    free(pending_buf);
+    pending_buf = NULL;
+  }
 }
 
 static Macro* find_macro(const char* name, int length) {
@@ -42,13 +64,16 @@ static Macro* find_macro(const char* name, int length) {
 
 void preprocessor_init(int (*getchar_cb)(void)) {
   underlying_getchar = getchar_cb;
+  if (!pending_buf) {
+    pending_buf = (char*)malloc(PENDING_BUF_SIZE);
+  }
   pending_pos = 0;
   pending_len = 0;
 }
 
 static void append_to_pending(const char* s) {
   int len = strlen(s);
-  if (pending_len + len < (int)sizeof(pending_buf)) {
+  if (pending_buf && pending_len + len < PENDING_BUF_SIZE) {
     strcpy(pending_buf + pending_len, s);
     pending_len += len;
   }

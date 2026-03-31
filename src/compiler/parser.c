@@ -535,6 +535,11 @@ static ASTNode* parse_declaration() {
   exit(1);
 }
 
+void parser_cleanup(void) {
+  lexer_free_token(&current_token);
+  lexer_cleanup();
+}
+
 void parser_init(int (*getchar_cb)(void)) {
   lexer_init(getchar_cb);
   current_token = lexer_next_token();
