@@ -11,7 +11,7 @@ it directly into the application flash area.
   via UART to machine code on the target chip and runs it.
 - In its current state, uses less than 30KB of flash.
 
-(Why AVR128DB28? That's the chip I have on hand)
+*Why AVR128DB28?* That's the chip I have on hand
 
 ![Sending C code via UART and executing](uart.png)
 
@@ -21,7 +21,11 @@ it directly into the application flash area.
   with 32KB for application code). This is currently hardcoded but can be
   changed relatively easy to accomodate larger programs (but why?).
 - **Clock** is hardcoded to 24MHz internal oscillator.
-- **Communication** is hardcoded to USART2 @ 9600 Baud (pins PF0 and PF1).
+- **Communication** is hardcoded to USART2 @ 2400 Baud (pins PF0 and PF1).
+
+*Why the low BAUD rate?* The compiler needs to compile things. If a whole
+program is pasted into fast UART, there's a high chance that the UART rx buffer
+will fill up faster than the compile can consume it, leading to dropped chars.
 
 The compiler supports a very small subset of C:
 - Types: `int`, `void`, `uint8_t`, `uint16_t`.
@@ -60,7 +64,7 @@ The output hex or bin file can then be flashed with avrdude.
 0. Ensure you have the avr-gcc toolchain installed.
 1. Modify `Makefile` for your setup of programmer and board.
 2. `make avr && make load`
-3. Connect to USART2 (TX=PF0, RX=PF1) at 9600 baud (`screen /dev/ttyACM0 9600`)
+3. Connect to USART2 (TX=PF0, RX=PF1) at 2400 baud (`screen /dev/ttyACM0 2400`)
 4. Send your C source code then end the transmission with a null byte (`\0`)
    or `Ctrl+D` if using `screen`.
 5. The compiler will report progress and jump to the application.

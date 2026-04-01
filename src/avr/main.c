@@ -20,13 +20,13 @@
 #define BOOT_SIZE (0xC0 * 512UL)
 #define APP_START BOOT_SIZE
 
-FUSES = {
-    .OSCCFG = CLKSEL_OSCHF_gc,
-    .SYSCFG0 = CRCSRC_NOCRC_gc | RSTPINCFG_GPIO_gc,
-    .SYSCFG1 = SUT_64MS_gc,
-    .CODESIZE = 0x00,
-    .BOOTSIZE = 0xC0
-};
+// FUSES = {
+//     .OSCCFG = CLKSEL_OSCHF_gc,
+//     .SYSCFG0 = CRCSRC_NOCRC_gc | RSTPINCFG_GPIO_gc,
+//     .SYSCFG1 = SUT_64MS_gc,
+//     .CODESIZE = 0x00,
+//     .BOOTSIZE = 0xC0
+// };
 
 static inline void pgm_word_write(uint32_t address, uint16_t data) {
   __asm__ __volatile__(
@@ -85,7 +85,7 @@ static void read_page(uint32_t address, uint8_t* buf) {
 
 static bool eof_reached = false;
 
-int avr_getchar(void) {
+int console_getchar(void) {
   if (eof_reached) return EOF;
   while (!usart_available(2));
   uint8_t c = usart_getc(2);
@@ -117,6 +117,7 @@ static uint16_t get_free_ram(void) {
   return free_memory;
 }
 
+
 static uint32_t avr_pc = APP_START;
 static uint8_t* current_page_buf = NULL;
 
@@ -138,6 +139,7 @@ static void avr_emit_cb(const char* line) {
     }
   }
 }
+
 
 static void register_bootloader_symbols() {
   dasm_add_symbol(
@@ -175,6 +177,7 @@ static void register_bootloader_symbols() {
   );
 }
 
+
 void dasm_read_page_cb(uint32_t page_addr, uint8_t* page_buf) {
   read_page(APP_START + page_addr, page_buf);
 }
@@ -183,18 +186,19 @@ void dasm_write_page_cb(uint32_t page_addr, uint8_t* page_buf) {
   write_page(APP_START + page_addr, page_buf);
 }
 
+
 int main(void) {
   // Move interrupts to boot section
   ccp_write_io((void*)&CPUINT.CTRLA, CPUINT_IVSEL_bm);
 
   set_clock();
-  usart_console_init(2, 9600);
+  usart_console_init(2, 2400);
 
   // Global interrupts enable
   sei();
 
   _delay_ms(1000);
-  printf_P(PSTR("Enter C source ending with EOT or NULL.\r\n"));
+  printf_P(PSTR("Enter C source ending with EOT or NULL.\r\n==========\r\n"));
   current_page_buf = (uint8_t*)malloc(PROGMEM_PAGE_SIZE);
   memset(current_page_buf, 0xFF, PROGMEM_PAGE_SIZE);
   avr_pc = APP_START;
@@ -202,20 +206,14 @@ int main(void) {
   printf_P(PSTR("Free RAM: %u\r\n"), get_free_ram());
   dasm_init();
   register_bootloader_symbols();
-  preprocessor_init(avr_getchar);
+  preprocessor_init(console_getchar);
   parser_init(preprocessor_getchar);
   codegen_set_emit_cb(avr_emit_cb);
   codegen_prologue();
 
   ASTNode* decl;
-  uint16_t ram_low_watermark = get_free_ram();
-  printf_P(PSTR("Prologue RAM low watermark: %u\r\n"), ram_low_watermark);
   while ((decl = parse_top_level_declaration()) != NULL) {
     codegen_top_level(decl);
-    uint16_t free_ram = get_free_ram();
-    if (free_ram < ram_low_watermark) {
-      ram_low_watermark = free_ram;
-    }
     ast_free_node(decl);
   }
 
@@ -224,7 +222,7 @@ int main(void) {
   if (offset > 0) {
     write_page(avr_pc - offset, current_page_buf);
   }
-  printf_P(PSTR("Codegen RAM low watermark: %u\r\n"), get_free_ram());
+  printf_P(PSTR("\r\nCodegen RAM low watermark: %u\r\n"), get_free_ram());
 
   printf_P(PSTR("Code generation done. Applying fixups...\r\n"));
   dasm_apply_fixups(dasm_read_page_cb, dasm_write_page_cb);
