@@ -25,7 +25,7 @@ it directly into the application flash area.
 
 *Why the low BAUD rate?* The compiler needs to compile things. If a whole
 program is pasted into fast UART, there's a high chance that the UART rx buffer
-will fill up faster than the compile can consume it, leading to dropped chars.
+will fill up faster than the compiler can consume it, leading to dropped chars.
 
 The compiler supports a very small subset of C:
 - Types: `int`, `void`, `uint8_t`, `uint16_t`.
