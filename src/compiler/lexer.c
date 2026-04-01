@@ -168,6 +168,31 @@ Token lexer_next_token(void) {
     return make_token(TOK_NUMBER, lexeme, lexeme_len);
   }
 
+  if (c == '\'') {
+    char char_val = 0;
+    if (peek() == '\\') {
+      advance(); // skip backslash
+      char esc = advance();
+      switch (esc) {
+        case 'n': char_val = '\n'; break;
+        case 'r': char_val = '\r'; break;
+        case 't': char_val = '\t'; break;
+        case '0': char_val = '\0'; break;
+        case '\\': char_val = '\\'; break;
+        case '\'': char_val = '\''; break;
+        case '\"': char_val = '\"'; break;
+        default: char_val = esc; break; // handle unknown gracefully
+      }
+    } else {
+      char_val = advance();
+    }
+    if (peek() == '\'') advance(); // skip closing quote
+
+    lexeme_clear();
+    lexeme_len = sprintf(lexeme, "%u", (unsigned char)char_val);
+    return make_token(TOK_NUMBER, lexeme, lexeme_len);
+  }
+
   if (c == '"') {
     lexeme_clear();  // Clear starting "
     while (peek() != '"' && peek() != '\0') {
