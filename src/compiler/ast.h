@@ -30,6 +30,7 @@ typedef enum : uint8_t {
   AST_FOR,
   AST_RETURN,
   AST_EXPR_STMT,
+  AST_ASM,
   AST_ASSIGN,
   AST_BINARY_OP,
   AST_UNARY_OP,
@@ -100,6 +101,11 @@ typedef struct ASTNode {
     struct {
       char* name;
     } var;
+
+    // For AST_ASM
+    struct {
+      char* asm_text;
+    } inline_asm;
 
     // For AST_NUMBER
     struct {

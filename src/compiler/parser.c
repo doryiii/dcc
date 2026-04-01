@@ -410,6 +410,34 @@ static ASTNode* parse_statement() {
 
     node->as.loop.body = parse_statement();
     return node;
+  } else if (check(TOK_ASM)) {
+    ASTNode* node = ast_create_node(AST_ASM, current_token.line);
+    advance_token();  // __asm__
+    match(TOK_LPAREN);
+    if (check(TOK_STRING)) {
+      node->as.inline_asm.asm_text = intern_string(current_token.text);
+      advance_token();
+    } else {
+      fprintf(stderr, "Error: expected string literal in __asm__\n");
+      exit(1);
+    }
+
+    // Optional colons for inputs/outputs/clobbers (ignoring them for now)
+    while (check(TOK_SEMICOLON) == false && check(TOK_RPAREN) == false) {
+      if (check(TOK_COLON)) {
+        advance_token();
+        // Skip until next colon or RPAREN
+        while (check(TOK_COLON) == false && check(TOK_RPAREN) == false) {
+          advance_token();
+        }
+      } else {
+        break;
+      }
+    }
+
+    match(TOK_RPAREN);
+    match(TOK_SEMICOLON);
+    return node;
   } else if (check(TOK_RETURN)) {
     ASTNode* node = ast_create_node(AST_RETURN, current_token.line);
     advance_token();

@@ -128,6 +128,7 @@ void ast_free_node(ASTNode* node) {
       if (node->as.member.expr) ast_free_node(node->as.member.expr);
       break;
 
+    case AST_ASM:
     case AST_VAR_ACCESS:
       break;
 
@@ -201,6 +202,9 @@ void ast_print(ASTNode* node, int indent) {
       break;
     case AST_EXPR_STMT:
       printf("ExprStmt\n");
+      break;
+    case AST_ASM:
+      printf("Asm: %s\n", node->as.inline_asm.asm_text);
       break;
     case AST_ASSIGN:
       printf("Assign\n");

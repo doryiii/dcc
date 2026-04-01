@@ -635,6 +635,12 @@ static void visit_expr_stmt(ASTNode* node) {
   if (node->as.single_expr.expr) visit(node->as.single_expr.expr);
 }
 
+static void visit_asm(ASTNode* node) {
+  if (node->as.inline_asm.asm_text) {
+    EMIT("    %s\n", node->as.inline_asm.asm_text);
+  }
+}
+
 static void visit_func_call(ASTNode* node) {
   ASTNode* arg = node->first_child;
   int num_args = 0;
@@ -692,6 +698,9 @@ static void visit(ASTNode* node) {
       break;
     case AST_EXPR_STMT:
       visit_expr_stmt(node);
+      break;
+    case AST_ASM:
+      visit_asm(node);
       break;
     case AST_IF:
       visit_if(node);

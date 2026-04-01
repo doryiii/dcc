@@ -96,6 +96,8 @@ static Token check_keyword_or_id(const char* text, int length) {
     return make_token(TOK_UINT8_T, text, length);
   if (length == 8 && strncmp(text, "uint16_t", 8) == 0)
     return make_token(TOK_UINT16_T, text, length);
+  if (length == 7 && strncmp(text, "__asm__", 7) == 0)
+    return make_token(TOK_ASM, text, length);
 
   return make_token(TOK_IDENTIFIER, text, length);
 }
@@ -166,6 +168,15 @@ Token lexer_next_token(void) {
     return make_token(TOK_NUMBER, lexeme, lexeme_len);
   }
 
+  if (c == '"') {
+    lexeme_clear();  // Clear starting "
+    while (peek() != '"' && peek() != '\0') {
+      lexeme_append(advance());
+    }
+    if (peek() == '"') advance();  // skip closing "
+    return make_token(TOK_STRING, lexeme, lexeme_len);
+  }
+
   switch (c) {
     case '+':
       if (peek() == '+') {
@@ -229,6 +240,8 @@ Token lexer_next_token(void) {
       return make_token(TOK_BIT_XOR, lexeme, 1);
     case ';':
       return make_token(TOK_SEMICOLON, lexeme, 1);
+    case ':':
+      return make_token(TOK_COLON, lexeme, 1);
     case ',':
       return make_token(TOK_COMMA, lexeme, 1);
     case '(':
@@ -285,6 +298,10 @@ const char* lexer_token_type_name(TokenType type) {
       return "UINT8_T";
     case TOK_UINT16_T:
       return "UINT16_T";
+    case TOK_ASM:
+      return "ASM";
+    case TOK_STRING:
+      return "STRING";
     case TOK_PLUS:
       return "PLUS";
     case TOK_MINUS:
@@ -329,6 +346,8 @@ const char* lexer_token_type_name(TokenType type) {
       return "DEC";
     case TOK_SEMICOLON:
       return "SEMICOLON";
+    case TOK_COLON:
+      return "COLON";
     case TOK_COMMA:
       return "COMMA";
     case TOK_LPAREN:

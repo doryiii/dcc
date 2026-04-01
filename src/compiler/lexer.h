@@ -6,8 +6,6 @@
 
 typedef enum {
   TOK_EOF = 0,
-  TOK_IDENTIFIER,
-  TOK_NUMBER,
 
   // Keywords
   TOK_INT,
@@ -20,6 +18,12 @@ typedef enum {
   TOK_STRUCT,
   TOK_UINT8_T,
   TOK_UINT16_T,
+  TOK_ASM,
+
+  // Literals
+  TOK_IDENTIFIER,
+  TOK_NUMBER,
+  TOK_STRING,
 
   // Operators
   TOK_PLUS,     // +
@@ -46,6 +50,7 @@ typedef enum {
 
   // Punctuation
   TOK_SEMICOLON,  // ;
+  TOK_COLON,      // :
   TOK_COMMA,      // ,
   TOK_LPAREN,     // (
   TOK_RPAREN,     // )
