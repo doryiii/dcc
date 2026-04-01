@@ -63,9 +63,62 @@ int test_lexer_operators() {
   return 0;
 }
 
+int test_lexer_char_literal() {
+  const char* source = "uint8_t a = 'a'; '\\n'";
+  test_src = source;
+  lexer_init(test_getchar);
+
+  TokenType expected[] = {
+      TOK_UINT8_T, TOK_IDENTIFIER, TOK_ASSIGN, TOK_NUMBER, TOK_SEMICOLON,
+      TOK_NUMBER, TOK_EOF
+  };
+
+  for (int i = 0; i < 7; i++) {
+    Token t = lexer_next_token();
+    if (t.type != expected[i]) {
+      fprintf(
+          stderr, "FAIL: test_lexer_char_literal index %d: expected %s, got %s\n",
+          i, lexer_token_type_name(expected[i]), lexer_token_type_name(t.type)
+      );
+      lexer_free_token(&t);
+      return 1;
+    }
+    lexer_free_token(&t);
+  }
+  printf("PASS: test_lexer_char_literal\n");
+  return 0;
+}
+
+int test_lexer_asm() {
+  const char* source = "__asm__(\"nop\" : :);";
+  test_src = source;
+  lexer_init(test_getchar);
+
+  TokenType expected[] = {
+      TOK_ASM, TOK_LPAREN, TOK_STRING, TOK_COLON, TOK_COLON, TOK_RPAREN, TOK_SEMICOLON, TOK_EOF
+  };
+
+  for (int i = 0; i < 8; i++) {
+    Token t = lexer_next_token();
+    if (t.type != expected[i]) {
+      fprintf(
+          stderr, "FAIL: test_lexer_asm index %d: expected %s, got %s\n",
+          i, lexer_token_type_name(expected[i]), lexer_token_type_name(t.type)
+      );
+      lexer_free_token(&t);
+      return 1;
+    }
+    lexer_free_token(&t);
+  }
+  printf("PASS: test_lexer_asm\n");
+  return 0;
+}
+
 int main() {
   int failed = 0;
   failed += test_lexer_basic();
   failed += test_lexer_operators();
+  failed += test_lexer_char_literal();
+  failed += test_lexer_asm();
   return failed > 0 ? 1 : 0;
 }
