@@ -2,7 +2,13 @@ Language: C
 BasedOnStyle: Google
 IndentWidth: 2
 ContinuationIndentWidth: 4
-AlignAfterOpenBracket: BlockIndent
+AlignAfterOpenBracket: true
+BreakAfterOpenBracketBracedList: true
+BreakAfterOpenBracketFunction: true
+BreakAfterOpenBracketIf: true
+BreakBeforeCloseBracketBracedList: true
+BreakBeforeCloseBracketFunction: true
+BreakBeforeCloseBracketIf: true
 BinPackArguments: true
 BinPackParameters: true
 MaxEmptyLinesToKeep: 2
